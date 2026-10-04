@@ -11,7 +11,7 @@ function decimals(step) {
 // Posición del centro del thumb para una fracción 0..1 del rango
 const thumbCenter = (f) => `(${f} * (100% - var(--tw)) + var(--tw) / 2)`
 
-function Slider({ label, value, min, max, step, unit = '', onChange }) {
+function Slider({ label, value, min, max, step, unit = '', dimmed, onChange }) {
   const pct = (value - min) / (max - min)
   // Rangos bipolares rellenan desde el cero
   const zero = min < 0 && max > 0 ? -min / (max - min) : 0
@@ -21,7 +21,8 @@ function Slider({ label, value, min, max, step, unit = '', onChange }) {
   const width = `calc(${thumbCenter(hi)} - ${left === '0px' ? '0px' : thumbCenter(lo)})`
 
   return (
-    <label className={s.row}>
+    <label className={`${s.row} ${dimmed ? s.dimmed : ''}`}>
+      <span className={s.label}>{label}</span>
       <div className={s.track}>
         <div className={s.rail} />
         <div className={s.fill} style={{ left, width }} />
@@ -39,7 +40,6 @@ function Slider({ label, value, min, max, step, unit = '', onChange }) {
           aria-label={label}
         />
       </div>
-      <span className={s.label}>{label}</span>
     </label>
   )
 }
@@ -47,28 +47,90 @@ function Slider({ label, value, min, max, step, unit = '', onChange }) {
 function ColorField({ label, value, dimmed, onChange }) {
   return (
     <label className={`${s.row} ${dimmed ? s.dimmed : ''}`}>
+      <span className={s.label}>{label}</span>
       <div className={s.colorValue}>
+        <span className={s.hex}>{value.toUpperCase()}</span>
         <span className={s.swatch} style={{ background: value }}>
           <input type="color" value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} />
         </span>
-        <span className={s.hex}>{value.toUpperCase()}</span>
       </div>
-      <span className={s.label}>{label}</span>
     </label>
   )
 }
 
-function Section({ title, index, children }) {
+function ToggleField({ label, value, onChange }) {
+  return (
+    <label className={s.row}>
+      <span className={s.label}>{label}</span>
+      <span className={s.toggleWrap}>
+        <input
+          type="checkbox"
+          role="switch"
+          className={s.toggle}
+          checked={value}
+          onChange={(e) => onChange(e.target.checked)}
+          aria-label={label}
+        />
+      </span>
+    </label>
+  )
+}
+
+function SelectField({ label, value, options, dimmed, onChange }) {
+  return (
+    <label className={`${s.row} ${dimmed ? s.dimmed : ''}`}>
+      <span className={s.label}>{label}</span>
+      <span className={s.selectWrap}>
+        <select className={s.select} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>
+          {options.map(([v, text]) => (
+            <option key={v} value={v}>
+              {text}
+            </option>
+          ))}
+        </select>
+        <svg className={s.selectChevron} viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </span>
+    </label>
+  )
+}
+
+function Section({ title, children, onReset, canReset }) {
   const [open, setOpen] = useState(true)
+  const toggle = () => setOpen(!open)
   return (
     <section className={s.group}>
-      <button type="button" className={s.header} onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className={s.headerIndex}>{String(index).padStart(2, '0')}</span>
-        <span className={s.headerTitle}>{title}</span>
-        <span className={s.toggle} aria-hidden="true">
-          {open ? '−' : '+'}
-        </span>
-      </button>
+      <div className={s.header}>
+        <button type="button" className={s.headerToggle} onClick={toggle} aria-expanded={open}>
+          {title}
+        </button>
+        {onReset && (
+          <button
+            type="button"
+            className={s.reset}
+            onClick={onReset}
+            disabled={!canReset}
+            title={`Restablecer ${title.toLowerCase()} a los valores originales`}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 12a8 8 0 1 0 2.4-5.7" />
+              <path d="M4 4v4.5h4.5" />
+            </svg>
+            Restablecer
+          </button>
+        )}
+        <button
+          type="button"
+          className={s.chevronBtn}
+          onClick={toggle}
+          aria-label={open ? `Ocultar ${title}` : `Mostrar ${title}`}
+        >
+          <svg className={`${s.chevron} ${open ? s.chevronOpen : ''}`} viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      </div>
       {open && <div className={s.card}>{children}</div>}
     </section>
   )
@@ -98,6 +160,11 @@ function FormatPicker({ formats, value, onChange }) {
             <span className={s.formatSize}>
               {f.w}×{f.h}
             </span>
+            {active && (
+              <svg className={s.check} viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
+            )}
           </button>
         )
       })}
@@ -106,28 +173,51 @@ function FormatPicker({ formats, value, onChange }) {
 }
 
 function ParamControls({ controls, params, onChange }) {
-  return controls.map((c) =>
-    c.type === 'color' ? (
-      <ColorField
-        key={c.key}
-        label={c.label}
-        value={params[c.key]}
-        dimmed={Number(c.key.slice(-1)) > params.colorCount}
-        onChange={(v) => onChange(c.key, v)}
-      />
-    ) : (
-      <Slider
-        key={c.key}
-        label={c.label}
-        min={c.min}
-        max={c.max}
-        step={c.step}
-        unit={c.unit}
-        value={params[c.key]}
-        onChange={(v) => onChange(c.key, v)}
-      />
-    ),
-  )
+  return controls.map((c) => {
+    if (c.hidden) return null
+    const set = (v) => onChange(c.key, v)
+    // Controles que dependen de un interruptor se atenúan cuando está apagado
+    const off = c.dependsOn ? !params[c.dependsOn] : false
+    switch (c.type) {
+      case 'color':
+        return (
+          <ColorField
+            key={c.key}
+            label={c.label}
+            value={params[c.key]}
+            dimmed={off || Number(c.key.slice(-1)) > params.colorCount}
+            onChange={set}
+          />
+        )
+      case 'toggle':
+        return <ToggleField key={c.key} label={c.label} value={params[c.key]} onChange={set} />
+      case 'select':
+        return (
+          <SelectField
+            key={c.key}
+            label={c.label}
+            value={params[c.key]}
+            options={c.options}
+            dimmed={off}
+            onChange={set}
+          />
+        )
+      default:
+        return (
+          <Slider
+            key={c.key}
+            label={c.label}
+            min={c.min}
+            max={c.max}
+            step={c.step}
+            unit={c.unit}
+            value={params[c.key]}
+            dimmed={off}
+            onChange={set}
+          />
+        )
+    }
+  })
 }
 
 export default function ControlPanel({
@@ -139,35 +229,42 @@ export default function ControlPanel({
   onFormatChange,
   textureZoom,
   onTextureZoomChange,
+  onResetGroup,
   onExport,
   exportLabel,
 }) {
   return (
     <aside className={s.panel}>
-      <Section title="Formato" index={1}>
-        <FormatPicker formats={formats} value={formatId} onChange={onFormatChange} />
-        <Slider
-          label="zoom textura"
-          min={0.25}
-          max={4}
-          step={0.01}
-          unit="×"
-          value={textureZoom}
-          onChange={onTextureZoomChange}
-        />
-      </Section>
-      {groups.map((g, i) => (
-        <Section key={g.id} title={g.title} index={i + 2}>
-          <ParamControls controls={g.controls} params={params} onChange={onChange} />
+      <div className={s.body}>
+        <Section title="Formato">
+          <FormatPicker formats={formats} value={formatId} onChange={onFormatChange} />
+          <Slider
+            label="zoom textura"
+            min={0.25}
+            max={4}
+            step={0.01}
+            unit="×"
+            value={textureZoom}
+            onChange={onTextureZoomChange}
+          />
         </Section>
-      ))}
-      <button type="button" className={s.export} onClick={onExport}>
-        <span className={s.exportSquare} aria-hidden="true" />
-        <span>Exportar</span>
-        <span className={s.exportLine} aria-hidden="true" />
-        <span>{exportLabel}</span>
-        <span className={s.exportFormat}>PNG</span>
-      </button>
+        {groups.map((g) => (
+          <Section
+            key={g.id}
+            title={g.title}
+            onReset={() => onResetGroup(g)}
+            canReset={g.controls.some((c) => params[c.key] !== c.value)}
+          >
+            <ParamControls controls={g.controls} params={params} onChange={onChange} />
+          </Section>
+        ))}
+      </div>
+      <div className={s.footer}>
+        <button type="button" className={s.export} onClick={onExport}>
+          Exportar PNG
+          <span className={s.exportSize}>{exportLabel}</span>
+        </button>
+      </div>
     </aside>
   )
 }

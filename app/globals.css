@@ -1,16 +1,30 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {
-  background: #0a0a0b;
+  background: #0a0a0a;
   -webkit-text-size-adjust: 100%;
 }
 
 /* --ar (ancho / alto del formato) lo fija el componente en .app */
 .app {
   --gutter: clamp(16px, 2.5vw, 32px);
+  position: relative;
+  isolation: isolate;
   height: 100dvh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+/* Lienzo punteado tipo editor en toda la ventana, debajo de la interfaz */
+.app::after {
+  content: '';
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.186) 0.6px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: center top;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .layout {
@@ -32,11 +46,7 @@ body {
   touch-action: pan-y;  /* la pinza llega al lienzo; el scroll vertical sigue funcionando */
   user-select: none;
   -webkit-user-select: none;
-  /* Lienzo punteado tipo editor; centrado para que la cuadrícula quede simétrica */
-  background-color: #0a0a0b;
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.136) 0.6px, transparent 1px);
-  background-size: 18px 18px;
-  background-position: center;
+  background: transparent;
 }
 .stage.zoomed {
   touch-action: none;
@@ -53,7 +63,7 @@ body {
   top: 0;
 }
 .frameShadow {
-  border-radius: 2px;
+  border-radius: 14px; /* igual que PREVIEW_RADIUS en Studio.jsx */
   background: #000;
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.7);
   pointer-events: none;
@@ -64,7 +74,7 @@ body {
 }
 
 .layout > aside {
-  padding: var(--gutter) max(var(--gutter), env(safe-area-inset-right)) var(--gutter) 0;
+  margin: var(--gutter) max(var(--gutter), env(safe-area-inset-right)) var(--gutter) 0;
 }
 
 /* Teléfonos y tablets en vertical: preview fijo arriba, panel debajo */
@@ -75,7 +85,7 @@ body {
   }
 
   .layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .stage {
@@ -87,12 +97,17 @@ body {
     padding: var(--gutter);
     padding-top: max(var(--gutter), env(safe-area-inset-top));
     padding-bottom: calc(var(--gutter) + 44px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    /* Fondo esmerilado para el contenido que pasa por debajo, con sus propios puntos nítidos */
+    background-color: rgba(10, 10, 10, 0.6);
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.186) 0.6px, transparent 1px);
+    background-size: 24px 24px;
+    background-position: center top;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
   }
 
   .layout > aside {
-    overflow: visible;
-    padding: 4px max(var(--gutter), env(safe-area-inset-right))
+    margin: 4px max(var(--gutter), env(safe-area-inset-right))
       max(var(--gutter), env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
   }
 }

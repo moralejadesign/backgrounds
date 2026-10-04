@@ -45,6 +45,7 @@ function draw(renderer, material, pipeline, { effect, params, view, format }) {
   } else {
     material.uniforms.uView.value.copy(view)
     material.uniforms.uGrainOn.value = 1
+    material.uniforms.uDitherPass.value = 1
     pipeline.pass(renderer, material, null)
   }
 }
@@ -88,6 +89,9 @@ function measureStage(el) {
   }
 }
 
+// Radio de las esquinas del preview (solo en pantalla; el PNG exportado sale recto)
+const PREVIEW_RADIUS = 14
+
 const isTyping = (el) => el && (el.isContentEditable || /^(TEXTAREA|SELECT)$/.test(el.tagName) ||
   (el.tagName === 'INPUT' && !['range', 'color', 'button'].includes(el.type)))
 
@@ -106,12 +110,29 @@ export default function Studio() {
   const params = paramsByEffect[effectId]
   const setParam = (key, value) =>
     setParamsByEffect((all) => ({ ...all, [effectId]: { ...all[effectId], [key]: value } }))
+  // Restablecer: devuelve los controles de una sección a los valores originales del efecto
+  const resetGroup = (group) =>
+    setParamsByEffect((all) => ({
+      ...all,
+      [effectId]: { ...all[effectId], ...Object.fromEntries(group.controls.map((c) => [c.key, c.value])) },
+    }))
 
-  const [formatId, setFormatId] = useState(formats[0].id)
+  // Formato y zoom de textura (escala el patrón; afecta al export) también son por efecto,
+  // con el valor inicial del preset de cada uno
+  const [viewByEffect, setViewByEffect] = useState(() =>
+    Object.fromEntries(
+      effects.map((e) => [
+        e.id,
+        { formatId: e.preset?.format ?? formats[0].id, textureZoom: e.preset?.textureZoom ?? 1 },
+      ]),
+    ),
+  )
+  const { formatId, textureZoom } = viewByEffect[effectId]
   const format = formats.find((f) => f.id === formatId)
-
-  // Zoom de textura (escala el patrón; afecta al export)
-  const [textureZoom, setTextureZoom] = useState(1)
+  const setEffectView = (patch) =>
+    setViewByEffect((all) => ({ ...all, [effectId]: { ...all[effectId], ...patch } }))
+  const setFormatId = (id) => setEffectView({ formatId: id })
+  const setTextureZoom = (z) => setEffectView({ textureZoom: z })
 
   // Zoom de vista (solo para inspeccionar; no afecta al export)
   const [stage, setStage] = useState(null)
@@ -178,8 +199,16 @@ export default function Studio() {
       canvas.style.display = 'none'
       return
     }
+    // Solo se redondean las esquinas del lienzo que coinciden con esquinas reales de la imagen
+    // (con zoom, la imagen puede salirse del escenario y el recorte no debe verse redondeado)
+    const atL = vis.left - img.left < 1
+    const atT = vis.top - img.top < 1
+    const atR = img.left + img.w - (vis.left + vis.w) < 1
+    const atB = img.top + img.h - (vis.top + vis.h) < 1
+    const corner = (a, b) => (a && b ? `${PREVIEW_RADIUS}px` : '0')
     Object.assign(canvas.style, {
       display: 'block', left: `${vis.left}px`, top: `${vis.top}px`, width: `${vis.w}px`, height: `${vis.h}px`,
+      borderRadius: `${corner(atT, atL)} ${corner(atT, atR)} ${corner(atB, atR)} ${corner(atB, atL)}`,
     })
     const size = gl.renderer.getSize(new THREE.Vector2())
     if (size.x !== vis.w || size.y !== vis.h) gl.renderer.setSize(vis.w, vis.h, false)
@@ -329,6 +358,7 @@ export default function Studio() {
           onFormatChange={setFormatId}
           textureZoom={textureZoom}
           onTextureZoomChange={setTextureZoom}
+          onResetGroup={resetGroup}
           onExport={() => glRef.current?.mesh.material && exportPNG(glRef.current.mesh.material, { effect, params, format })}
           exportLabel={`${format.w}×${format.h}`}
         />

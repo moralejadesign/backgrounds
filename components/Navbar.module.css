@@ -1,82 +1,108 @@
+/* Barra flotante de vidrio */
 .nav {
-  --accent: #ff4d1a;
-  --text: #f2f2f2;
-  --muted: #8a8a8e;
+  --cream: #f7ecd4;
+  --text: #f4f1ec;
+  --muted: rgba(244, 241, 236, 0.6);
 
   display: flex;
   align-items: center;
-  gap: clamp(20px, 4vw, 56px);
-  min-height: 64px;
-  padding: 10px max(var(--gutter), env(safe-area-inset-right)) 10px max(var(--gutter), env(safe-area-inset-left));
-  padding-top: max(10px, env(safe-area-inset-top));
-  background: rgba(255, 255, 255, 0.025);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  gap: clamp(16px, 3vw, 36px);
+  margin: max(12px, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 0
+    max(var(--gutter), env(safe-area-inset-left));
+  padding: 8px 8px 8px 20px;
+  border-radius: 24px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 16px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 .brand {
-  color: var(--text);
-  font-family: var(--font-display), 'Helvetica Neue', Arial, sans-serif;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.045em;
-  line-height: 1;
-  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--cream);
+  font-family: var(--font-display), var(--font-sans), sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   white-space: nowrap;
 }
 
+/* Marca: orbe con el degradado melocotón */
+.mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6ea, #f7c59a 45%, #e8743f 100%);
+  box-shadow: 0 0 12px rgba(245, 154, 98, 0.45);
+}
+
+/* Selector en píldora; la opción activa en negro sólido como la fila elegida */
 .tabs {
   display: flex;
-  gap: clamp(16px, 3vw, 40px);
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .tab {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0;
+  flex: none;
+  height: 34px;
+  padding: 0 16px;
   border: 0;
+  border-radius: 14px;
   background: none;
   color: var(--muted);
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 13px;
+  font: inherit;
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 .tab:hover {
   color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
 }
 .tab:focus-visible {
-  outline: 1px solid var(--text);
-  outline-offset: 4px;
+  outline: 2px solid var(--cream);
+  outline-offset: 2px;
 }
-
-/* Cuadrado de estado: solo visible en la pestaña activa */
-.square {
-  width: 8px;
-  height: 8px;
-  background: var(--accent);
-  transform: scale(0);
-  transition: transform 0.15s ease;
-}
-.tabActive {
+.tabActive,
+.tabActive:hover {
+  background: #0b0b0c;
   color: var(--text);
-}
-.tabActive .square {
-  transform: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
-@media (max-width: 560px) {
+@media (max-width: 640px) {
   .nav {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 8px 8px;
   }
   .brand {
-    font-size: 20px;
+    padding-left: 10px;
+    font-size: 18px;
+  }
+  .tabs {
+    margin-left: 0;
+  }
+  .tab {
+    flex: 1;
+    padding: 0 10px;
+    font-size: 13px;
   }
 }
