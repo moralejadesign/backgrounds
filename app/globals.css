@@ -1,113 +1,20 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
+
+:root {
+  --cream: #f7ecd4;
+  --text: #f4f1ec;
+  --muted: rgba(244, 241, 236, 0.55);
+  --fill-a: #6f6f72;
+  --fill-b: #c4c4c7;
+  --row: rgba(255, 255, 255, 0.055);
+  --row-border: rgba(255, 255, 255, 0.09);
+  --rail: rgba(255, 255, 255, 0.14);
+}
+
 body {
   background: #0a0a0a;
+  color: var(--text);
   -webkit-text-size-adjust: 100%;
-}
-
-/* --ar (ancho / alto del formato) lo fija el componente en .app */
-.app {
-  --gutter: clamp(16px, 2.5vw, 32px);
-  position: relative;
-  isolation: isolate;
-  height: 100dvh;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-/* Lienzo punteado tipo editor en toda la ventana, debajo de la interfaz */
-.app::after {
-  content: '';
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.186) 0.6px, transparent 1px);
-  background-size: 24px 24px;
-  background-position: center top;
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.layout {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(290px, 28vw, 360px);
-}
-
-/* El escenario: el preview se posiciona por JS (encaje + zoom de vista).
-   El padding define el margen del encaje "Ajustar". */
-.stage {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  padding: var(--gutter);
-  padding-left: max(var(--gutter), env(safe-area-inset-left));
-  padding-bottom: calc(var(--gutter) + 44px); /* deja sitio a la barra de zoom */
-  touch-action: pan-y;  /* la pinza llega al lienzo; el scroll vertical sigue funcionando */
-  user-select: none;
-  -webkit-user-select: none;
-  background: transparent;
-}
-.stage.zoomed {
-  touch-action: none;
-  cursor: grab;
-}
-.stage.dragging {
-  cursor: grabbing;
-}
-
-.frameShadow,
-.stageCanvas {
-  position: absolute;
-  left: 0;
-  top: 0;
-}
-.frameShadow {
-  border-radius: 14px; /* igual que PREVIEW_RADIUS en Studio.jsx */
-  background: #000;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.7);
-  pointer-events: none;
-}
-.stageCanvas {
-  z-index: 1;
-  display: block;
-}
-
-.layout > aside {
-  margin: var(--gutter) max(var(--gutter), env(safe-area-inset-right)) var(--gutter) 0;
-}
-
-/* Teléfonos y tablets en vertical: preview fijo arriba, panel debajo */
-@media (max-width: 760px) {
-  .app {
-    height: auto;
-    min-height: 100dvh;
-  }
-
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .stage {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    /* Alto justo para el formato, sin pasar de la mitad de la pantalla */
-    height: min(56dvh, calc((100vw - 2 * var(--gutter)) / var(--ar) + 2 * var(--gutter) + 44px));
-    padding: var(--gutter);
-    padding-top: max(var(--gutter), env(safe-area-inset-top));
-    padding-bottom: calc(var(--gutter) + 44px);
-    /* Fondo esmerilado para el contenido que pasa por debajo, con sus propios puntos nítidos */
-    background-color: rgba(10, 10, 10, 0.6);
-    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.186) 0.6px, transparent 1px);
-    background-size: 24px 24px;
-    background-position: center top;
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-  }
-
-  .layout > aside {
-    margin: 4px max(var(--gutter), env(safe-area-inset-right))
-      max(var(--gutter), env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
-  }
+  overscroll-behavior: none;
 }
