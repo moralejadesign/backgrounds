@@ -1,0 +1,349 @@
+.panel {
+  --accent: #ff4d1a;
+  --on: #5dff5a;
+  --text: #f2f2f2;
+  --muted: #8a8a8e;
+  --dim: #4a4a4e;
+  --glass: rgba(255, 255, 255, 0.03);
+  --glass-strong: rgba(255, 255, 255, 0.055);
+  --line: rgba(255, 255, 255, 0.18);
+
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* En una columna con scroll los hijos no deben encogerse */
+.panel > * {
+  flex: none;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Barra de sección: rectángulo gris translúcido con texto mono en mayúsculas */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(12px);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.header:hover {
+  background: rgba(255, 255, 255, 0.085);
+}
+.header:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: 2px;
+}
+
+.headerIndex {
+  color: var(--dim);
+  letter-spacing: 0.06em;
+}
+.headerTitle {
+  flex: 1;
+  text-align: left;
+}
+.toggle {
+  width: 12px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 2px;
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.label {
+  flex: none;
+  width: 104px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* --- Slider: línea fina con el valor en un bloque --- */
+.track {
+  --tw: 46px;
+  position: relative;
+  flex: 1;
+  height: 20px;
+}
+
+.rail,
+.fill {
+  position: absolute;
+  top: 50%;
+}
+.rail {
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+}
+.fill {
+  height: 2px;
+  margin-top: -0.5px;
+  background: var(--text);
+}
+
+.thumb {
+  position: absolute;
+  top: 1px;
+  width: var(--tw);
+  height: 18px;
+  border-radius: 2px;
+  background: #19191b;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  color: var(--text);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+  pointer-events: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.track:hover .thumb {
+  background: #252528;
+}
+.track:has(input:active) .thumb {
+  background: var(--text);
+  color: #111;
+}
+.track:has(input:focus-visible) .thumb {
+  outline: 1px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* El input nativo queda encima, invisible, con un thumb del mismo ancho
+   para que el mapeo puntero → valor coincida con el visual */
+.track input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: grab;
+  touch-action: pan-y;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+.track input:active {
+  cursor: grabbing;
+}
+.track input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 46px;
+  height: 20px;
+}
+.track input::-moz-range-thumb {
+  width: 46px;
+  height: 20px;
+  border: 0;
+}
+
+/* --- Color --- */
+.colorValue {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 20px;
+}
+
+.swatch {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+}
+.swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.swatch:has(input:focus-visible) {
+  outline: 1px solid var(--text);
+  outline-offset: 2px;
+}
+
+.hex {
+  color: var(--text);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.dimmed {
+  opacity: 0.3;
+}
+
+/* --- Formato --- */
+.formats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.format {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 4px 8px;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.format:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+.format:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: 2px;
+}
+.formatActive,
+.formatActive:hover {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  color: var(--text);
+}
+
+.formatShapeBox {
+  display: grid;
+  place-items: center;
+  height: 18px;
+  margin-bottom: 2px;
+}
+.formatShape {
+  display: block;
+  box-sizing: border-box;
+  border: 1px solid currentColor;
+}
+.formatActive .formatShape {
+  border-color: var(--accent);
+  background: rgba(255, 77, 26, 0.25);
+}
+.formatRatio {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.formatSize {
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+/* --- Exportar: como la barra "■ PAUSE ——— SOUND ON" --- */
+.export {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 46px;
+  margin-top: 4px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(12px);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.export:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.export:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: 2px;
+}
+.exportSquare {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  background: var(--accent);
+}
+.exportLine {
+  flex: 1;
+  min-width: 12px;
+  height: 1px;
+  background: var(--line);
+}
+.exportFormat {
+  margin-left: -4px;
+  color: var(--on);
+}
+
+/* Táctil: zona de agarre más alta que el visual */
+@media (pointer: coarse) {
+  .track input {
+    inset: -10px 0;
+    height: auto;
+  }
+  .card {
+    gap: 18px;
+  }
+  .swatch {
+    width: 24px;
+    height: 24px;
+  }
+}

@@ -1,0 +1,82 @@
+.nav {
+  --accent: #ff4d1a;
+  --text: #f2f2f2;
+  --muted: #8a8a8e;
+
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 4vw, 56px);
+  min-height: 64px;
+  padding: 10px max(var(--gutter), env(safe-area-inset-right)) 10px max(var(--gutter), env(safe-area-inset-left));
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: rgba(255, 255, 255, 0.025);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  -webkit-font-smoothing: antialiased;
+}
+
+.brand {
+  color: var(--text);
+  font-family: var(--font-display), 'Helvetica Neue', Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  gap: clamp(16px, 3vw, 40px);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: 4px;
+}
+
+/* Cuadrado de estado: solo visible en la pestaña activa */
+.square {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  transform: scale(0);
+  transition: transform 0.15s ease;
+}
+.tabActive {
+  color: var(--text);
+}
+.tabActive .square {
+  transform: none;
+}
+
+@media (max-width: 560px) {
+  .nav {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .brand {
+    font-size: 20px;
+  }
+}

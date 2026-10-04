@@ -1,0 +1,98 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: #0a0a0b;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* --ar (ancho / alto del formato) lo fija el componente en .app */
+.app {
+  --gutter: clamp(16px, 2.5vw, 32px);
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.layout {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(290px, 28vw, 360px);
+}
+
+/* El escenario: el preview se posiciona por JS (encaje + zoom de vista).
+   El padding define el margen del encaje "Ajustar". */
+.stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--gutter);
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-bottom: calc(var(--gutter) + 44px); /* deja sitio a la barra de zoom */
+  touch-action: pan-y;  /* la pinza llega al lienzo; el scroll vertical sigue funcionando */
+  user-select: none;
+  -webkit-user-select: none;
+  /* Lienzo punteado tipo editor; centrado para que la cuadrícula quede simétrica */
+  background-color: #0a0a0b;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.136) 0.6px, transparent 1px);
+  background-size: 18px 18px;
+  background-position: center;
+}
+.stage.zoomed {
+  touch-action: none;
+  cursor: grab;
+}
+.stage.dragging {
+  cursor: grabbing;
+}
+
+.frameShadow,
+.stageCanvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.frameShadow {
+  border-radius: 2px;
+  background: #000;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+.stageCanvas {
+  z-index: 1;
+  display: block;
+}
+
+.layout > aside {
+  padding: var(--gutter) max(var(--gutter), env(safe-area-inset-right)) var(--gutter) 0;
+}
+
+/* Teléfonos y tablets en vertical: preview fijo arriba, panel debajo */
+@media (max-width: 760px) {
+  .app {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .stage {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    /* Alto justo para el formato, sin pasar de la mitad de la pantalla */
+    height: min(56dvh, calc((100vw - 2 * var(--gutter)) / var(--ar) + 2 * var(--gutter) + 44px));
+    padding: var(--gutter);
+    padding-top: max(var(--gutter), env(safe-area-inset-top));
+    padding-bottom: calc(var(--gutter) + 44px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .layout > aside {
+    overflow: visible;
+    padding: 4px max(var(--gutter), env(safe-area-inset-right))
+      max(var(--gutter), env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+  }
+}
