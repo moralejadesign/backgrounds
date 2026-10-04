@@ -7,6 +7,9 @@ import { vertexShader, defaultsOf } from '@/lib/effects/common'
 import { formats } from '@/lib/formats'
 import { FIT_VIEW, computeLayout, zoomAt, stepScale, clampPan } from '@/lib/viewport'
 import { BlurPipeline } from '@/lib/blurPipeline'
+import { draw, downloadBlob } from '@/lib/render'
+import { animatedParams, isAnimated } from '@/lib/animation'
+import { exportMP4, canExportVideo } from '@/lib/videoExport'
 import Navbar from './Navbar'
 import ControlPanel from './ControlPanel'
 import ZoomBar from './ZoomBar'
@@ -27,48 +30,21 @@ function createMaterial(effect) {
   })
 }
 
-// Dibuja el efecto en el buffer actual del renderer: directo, o pasando por el desenfoque
-function draw(renderer, material, pipeline, { effect, params, view, format }) {
-  const blur = (params.blur ?? 0) / 100
-  const size = renderer.getDrawingBufferSize(new THREE.Vector2())
-  if (blur > 0) {
-    pipeline.render(renderer, material, {
-      view,
-      outW: size.x,
-      outH: size.y,
-      aspect: format.w / format.h,
-      blur,
-      grain: effect.grainOf(params),
-      grainRes: material.uniforms.uGrainRes.value,
-      seed: params.seed ?? 0,
-    })
-  } else {
-    material.uniforms.uView.value.copy(view)
-    material.uniforms.uGrainOn.value = 1
-    material.uniforms.uDitherPass.value = 1
-    pipeline.pass(renderer, material, null)
-  }
-}
-
-function exportPNG(material, ctx) {
-  const { w, h } = ctx.format
+function exportPNG(material, { effect, params, format }) {
+  const { w, h } = format
   const canvas = new OffscreenCanvas(w, h)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
   renderer.setPixelRatio(1)
   renderer.setSize(w, h, false)
 
   const mat = material.clone()
+  effect.apply(mat.uniforms, params)
   const pipeline = new BlurPipeline()
   // Imagen completa, sin el recorte del zoom de vista
-  draw(renderer, mat, pipeline, { ...ctx, view: new THREE.Vector4(0, 0, 1, 1) })
+  draw(renderer, mat, pipeline, { effect, params, format, view: new THREE.Vector4(0, 0, 1, 1) })
 
   canvas.convertToBlob({ type: 'image/png' }).then((blob) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `croma-${w}x${h}-${Date.now()}.png`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, `croma-${w}x${h}-${Date.now()}.png`)
     mat.dispose()
     pipeline.dispose()
     renderer.dispose()
@@ -134,6 +110,16 @@ export default function Studio() {
   const setFormatId = (id) => setEffectView({ formatId: id })
   const setTextureZoom = (z) => setEffectView({ textureZoom: z })
 
+  // Animación: el tiempo vive en un ref y el loop de reproducción dibuja sin pasar por React
+  const animated = isAnimated(effect, params)
+  const duration = params.animDuration ?? 6
+  const timeRef = useRef(0)
+  const progressRef = useRef(null)
+  const timeLabelRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [videoProgress, setVideoProgress] = useState(null) // null = sin exportar; 0..1 = renderizando
+  const loopT = () => (animated ? (timeRef.current % duration) / duration : 0)
+
   // Zoom de vista (solo para inspeccionar; no afecta al export)
   const [stage, setStage] = useState(null)
   const [view, setView] = useState(FIT_VIEW)
@@ -141,7 +127,8 @@ export default function Studio() {
 
   // Refs con el último estado para los manejadores de gestos
   const live = useRef({})
-  live.current = { stage, format, layout }
+  const renderRef = useRef(() => {})
+  live.current = { stage, format, layout, animated, duration, togglePlay: () => setPlaying((v) => !v) }
 
   useEffect(() => setView(FIT_VIEW), [formatId])
 
@@ -179,15 +166,17 @@ export default function Studio() {
     return () => material.dispose()
   }, [effect])
 
-  // Render bajo demanda: parámetros, formato, zoom de textura o vista
-  useEffect(() => {
+  // Render del preview en el instante actual del loop. Se reasigna en cada render de React
+  // (con el estado vigente) y lo llaman tanto ese render como el loop de reproducción.
+  renderRef.current = () => {
     const gl = glRef.current
     if (!gl || !layout || !gl.mesh.material) return
     const u = gl.mesh.material.uniforms
+    const frameParams = animatedParams(effect, params, loopT())
     u.uAspect.value = format.w / format.h
     u.uGrainRes.value.set(format.w, format.h)
     u.uZoom.value = textureZoom
-    effect.apply(u, params)
+    effect.apply(u, frameParams)
 
     const { img, vis } = layout
     Object.assign(shadowRef.current.style, {
@@ -220,8 +209,67 @@ export default function Studio() {
       vis.w / img.w,
       vis.h / img.h,
     )
-    draw(gl.renderer, gl.mesh.material, gl.pipeline, { effect, params, view, format })
+    draw(gl.renderer, gl.mesh.material, gl.pipeline, { effect, params: frameParams, view, format })
+  }
+
+  const syncTimeline = () => {
+    if (progressRef.current) progressRef.current.value = String(loopT() * 1000)
+    if (timeLabelRef.current) {
+      timeLabelRef.current.textContent = `${(loopT() * duration).toFixed(1)} / ${duration.toFixed(1)} s`
+    }
+  }
+
+  live.current.sync = syncTimeline
+
+  // Render bajo demanda: parámetros, formato, zoom de textura o vista
+  useEffect(() => {
+    renderRef.current()
+    syncTimeline()
   })
+
+  // Al activar la animación empieza a reproducirse; al desactivarla vuelve al cuadro base
+  useEffect(() => {
+    setPlaying(animated)
+    if (!animated) timeRef.current = 0
+  }, [animated, effectId])
+
+  // Loop de reproducción
+  useEffect(() => {
+    if (!playing) return
+    let raf
+    let last = performance.now()
+    const tick = (now) => {
+      timeRef.current = (timeRef.current + (now - last) / 1000) % live.current.duration
+      last = now
+      renderRef.current()
+      live.current.sync()
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [playing])
+
+  const scrub = (fraction) => {
+    timeRef.current = fraction * duration
+    renderRef.current()
+    syncTimeline()
+  }
+
+  const exportVideo = async () => {
+    const material = glRef.current?.mesh.material
+    if (!material || videoProgress !== null) return
+    setPlaying(false)
+    setVideoProgress(0)
+    try {
+      const blob = await exportMP4({ material, effect, params, format, onProgress: setVideoProgress })
+      downloadBlob(blob, `croma-${effect.id}-${format.w}x${format.h}-${duration}s.mp4`)
+    } catch (err) {
+      console.error(err)
+      alert(`No se pudo exportar el video: ${err.message}`)
+    } finally {
+      setVideoProgress(null)
+    }
+  }
 
   // Gestos: rueda/pinza para zoom, arrastre para paneo, doble clic, teclado
   useEffect(() => {
@@ -305,6 +353,7 @@ export default function Studio() {
       else if (e.key === '-' || e.key === '_') zoomTo(stepScale(layout.scale, -1), cx, cy)
       else if (e.key === '0') setView(FIT_VIEW)
       else if (e.key === '1') zoomTo(1, cx, cy)
+      else if (e.key === ' ' && live.current.animated && !/^(BUTTON|INPUT)$/.test(e.target.tagName)) live.current.togglePlay()
       else return
       e.preventDefault()
     }
@@ -346,6 +395,15 @@ export default function Studio() {
               onZoomOut={() => zoomFromCenter(stepScale(layout.scale, -1))}
               onFit={() => setView(FIT_VIEW)}
               onActualSize={() => zoomFromCenter(1)}
+              playback={
+                animated && {
+                  playing,
+                  onToggle: () => setPlaying((v) => !v),
+                  onScrub: scrub,
+                  progressRef,
+                  timeLabelRef,
+                }
+              }
             />
           )}
         </div>
@@ -359,8 +417,19 @@ export default function Studio() {
           textureZoom={textureZoom}
           onTextureZoomChange={setTextureZoom}
           onResetGroup={resetGroup}
-          onExport={() => glRef.current?.mesh.material && exportPNG(glRef.current.mesh.material, { effect, params, format })}
+          onExport={() =>
+            glRef.current?.mesh.material &&
+            exportPNG(glRef.current.mesh.material, { effect, params: animatedParams(effect, params, loopT()), format })
+          }
           exportLabel={`${format.w}×${format.h}`}
+          video={
+            animated && {
+              label: `${format.w}×${format.h} · ${duration} s`,
+              progress: videoProgress,
+              supported: canExportVideo(),
+              onExport: exportVideo,
+            }
+          }
         />
       </main>
     </div>

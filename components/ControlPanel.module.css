@@ -492,6 +492,54 @@
   font-weight: 500;
 }
 
+.footer:has(.exportSecondary) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.export:disabled {
+  cursor: default;
+}
+/* Progreso del render de video: la píldora se llena de izquierda a derecha */
+.exporting {
+  background: linear-gradient(90deg, #fff calc(var(--progress) * 100%), rgba(255, 255, 255, 0.55) 0);
+}
+.exporting:hover {
+  background: linear-gradient(90deg, #fff calc(var(--progress) * 100%), rgba(255, 255, 255, 0.55) 0);
+}
+
+.exportSecondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  border: 0;
+  border-radius: 19px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px var(--row-border);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.exportSecondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+.exportSecondary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.exportSecondary:focus-visible {
+  outline: 2px solid var(--cream);
+  outline-offset: 3px;
+}
+.exportSecondarySize {
+  color: var(--muted);
+}
+
 /* Táctil: zona de agarre más alta que el visual */
 @media (pointer: coarse) {
   .track input {

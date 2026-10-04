@@ -1,10 +1,11 @@
 import s from './Navbar.module.css'
+import Logo from './Logo'
 
 export default function Navbar({ effects, effectId, onEffectChange }) {
   return (
     <header className={s.nav}>
       <div className={s.brand}>
-        <span className={s.mark} aria-hidden="true" />
+        <Logo className={s.mark} />
         Croma Backgrounds
       </div>
       <nav className={s.tabs} aria-label="Efectos">

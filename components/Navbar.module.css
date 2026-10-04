@@ -34,13 +34,12 @@
   white-space: nowrap;
 }
 
-/* Marca: orbe con el degradado melocotón */
+/* Marca: azulejo con la C de barras */
 .mark {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff6ea, #f7c59a 45%, #e8743f 100%);
-  box-shadow: 0 0 12px rgba(245, 154, 98, 0.45);
+  flex: none;
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
 }
 
 /* Selector en píldora; la opción activa en negro sólido como la fila elegida */

@@ -232,6 +232,7 @@ export default function ControlPanel({
   onResetGroup,
   onExport,
   exportLabel,
+  video,
 }) {
   return (
     <aside className={s.panel}>
@@ -260,10 +261,40 @@ export default function ControlPanel({
         ))}
       </div>
       <div className={s.footer}>
-        <button type="button" className={s.export} onClick={onExport}>
-          Exportar PNG
-          <span className={s.exportSize}>{exportLabel}</span>
-        </button>
+        {video ? (
+          <>
+            {/* Con animación, el video es la acción principal; el PNG exporta el cuadro actual */}
+            <button
+              type="button"
+              className={`${s.export} ${video.progress !== null ? s.exporting : ''}`}
+              style={{ '--progress': video.progress ?? 0 }}
+              onClick={video.onExport}
+              disabled={!video.supported || video.progress !== null}
+              title={video.supported ? undefined : 'Este navegador no soporta exportar video (WebCodecs)'}
+            >
+              {video.progress !== null ? (
+                <>
+                  Renderizando
+                  <span className={s.exportSize}>{Math.round(video.progress * 100)}%</span>
+                </>
+              ) : (
+                <>
+                  Exportar MP4
+                  <span className={s.exportSize}>{video.label}</span>
+                </>
+              )}
+            </button>
+            <button type="button" className={s.exportSecondary} onClick={onExport} disabled={video.progress !== null}>
+              PNG del cuadro actual
+              <span className={s.exportSecondarySize}>{exportLabel}</span>
+            </button>
+          </>
+        ) : (
+          <button type="button" className={s.export} onClick={onExport}>
+            Exportar PNG
+            <span className={s.exportSize}>{exportLabel}</span>
+          </button>
+        )}
       </div>
     </aside>
   )
