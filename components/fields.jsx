@@ -1,5 +1,7 @@
 'use client'
 
+import { useRef, useState } from 'react'
+import ColorPicker from './ColorPicker'
 import s from './fields.module.css'
 
 function decimals(step) {
@@ -44,16 +46,27 @@ export function Slider({ label, value, min, max, step, unit = '', dimmed, onChan
 }
 
 export function ColorField({ label, value, dimmed, onChange }) {
+  const [open, setOpen] = useState(false)
+  const anchorRef = useRef(null)
   return (
-    <label className={`${s.row} ${dimmed ? s.dimmed : ''}`}>
+    <div className={`${s.row} ${dimmed ? s.dimmed : ''}`}>
       <span className={s.label}>{label}</span>
       <div className={s.colorValue}>
         <span className={s.hex}>{value.toUpperCase()}</span>
-        <span className={s.swatch} style={{ background: value }}>
-          <input type="color" value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} />
-        </span>
+        <button
+          ref={anchorRef}
+          type="button"
+          className={s.swatch}
+          style={{ background: value }}
+          onClick={() => setOpen((v) => !v)}
+          aria-label={`${label}: ${value.toUpperCase()}`}
+          aria-expanded={open}
+        />
       </div>
-    </label>
+      {open && (
+        <ColorPicker value={value} onChange={onChange} anchorRef={anchorRef} onClose={() => setOpen(false)} label={label} />
+      )}
+    </div>
   )
 }
 

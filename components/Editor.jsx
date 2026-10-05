@@ -19,6 +19,7 @@ import { exportPNG, exportMP4, canExportVideo, downloadBlob } from '@/lib/nodes/
 import NodeCard from './NodeCard'
 import OutputBody from './OutputBody'
 import Library from './Library'
+import Onboarding from './Onboarding'
 import s from './Editor.module.css'
 
 const WORK_MAX = 1280 // lado mayor de las texturas de trabajo del editor (el export va a tamaño real)
@@ -26,6 +27,9 @@ const ZOOM_MIN = 0.2
 const ZOOM_MAX = 2
 const GAP = 110 // separación horizontal al insertar nodos
 const LIBRARY_SPACE = 304 // ancho que ocupa la biblioteca a la izquierda
+const TOUR_KEY = 'croma-onboarding-v1'
+const MOBILE_QUERY = '(max-width: 760px)'
+const MOBILE_BAR = 84 // alto reservado para la barra de la biblioteca en móvil
 
 const isTyping = (el) =>
   el && (el.isContentEditable || /^(TEXTAREA|SELECT)$/.test(el.tagName) ||
@@ -66,6 +70,19 @@ export default function Editor() {
   const [exportProgress, setExportProgress] = useState(null)
   const [libraryCollapsed, setLibraryCollapsed] = useState(false)
   const [imageNames, setImageNames] = useState({})
+  const [tourOpen, setTourOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const gestureRef = useRef(null)
+
+  // Móvil: la biblioteca es una hoja inferior, plegada al empezar
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY)
+    const update = () => setIsMobile(mq.matches)
+    update()
+    if (mq.matches) setLibraryCollapsed(true)
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
   // WebCodecs solo existe en el navegador: se consulta tras montar (evita desajuste de hidratación)
   const [videoSupported, setVideoSupported] = useState(false)
   useEffect(() => setVideoSupported(canExportVideo()), [])
@@ -77,7 +94,7 @@ export default function Editor() {
 
   // Estado vigente para callbacks estables (gestos, loop de dibujo)
   const live = useRef({})
-  live.current = { graph, view, focus, format, duration, playing, selected, libraryCollapsed }
+  live.current = { graph, view, focus, format, duration, playing, selected, libraryCollapsed, tourOpen, isMobile }
 
   const loopT = () => (timeRef.current % live.current.duration) / live.current.duration
 
@@ -309,6 +326,38 @@ export default function Editor() {
     return { x: (clientX - view.x) / view.k, y: (clientY - view.y) / view.k }
   }
 
+  // Área libre para encajar contenido: a la derecha de la biblioteca (escritorio)
+  // o encima de su barra inferior (móvil)
+  const freeArea = () => {
+    if (window.matchMedia(MOBILE_QUERY).matches) {
+      return { left: 16, top: 16, w: window.innerWidth - 32, h: window.innerHeight - 32 - MOBILE_BAR }
+    }
+    const left = live.current.libraryCollapsed ? 40 : LIBRARY_SPACE + 30
+    return { left, top: 30, w: window.innerWidth - left - 40, h: window.innerHeight - 60 }
+  }
+
+  const fitBox = (x0, y0, x1, y1, maxK = 1) => {
+    const area = freeArea()
+    const k = Math.min(maxK, Math.max(ZOOM_MIN, Math.min(area.w / (x1 - x0), area.h / (y1 - y0))))
+    setView({ k, x: area.left + (area.w - (x1 - x0) * k) / 2 - x0 * k, y: area.top + (area.h - (y1 - y0) * k) / 2 - y0 * k })
+  }
+
+  const nodeBox = (n, a) => ({
+    x0: n.x,
+    y0: n.y,
+    x1: n.x + nodeWidth(n),
+    y1: n.y + HEADER_H + previewHeight(n, a) + (n.type === 'output' ? 330 : 260),
+  })
+
+  // Doble toque / doble clic en la cabecera: acerca la vista a ese nodo
+  const zoomToNode = (id) => {
+    const { graph, format } = live.current
+    const n = graph.nodes.find((x) => x.id === id)
+    if (!n) return
+    const b = nodeBox(n, format.w / format.h)
+    fitBox(b.x0 - 20, b.y0 - 20, b.x1 + 20, b.y1 + 20, 1.4)
+  }
+
   const fitView = () => {
     const { graph, format } = live.current
     const a = format.w / format.h
@@ -322,17 +371,37 @@ export default function Editor() {
     const y0 = Math.min(...boxes.map((b) => b.y0))
     const x1 = Math.max(...boxes.map((b) => b.x1))
     const y1 = Math.max(...boxes.map((b) => b.y1))
-    const left = live.current.libraryCollapsed ? 40 : LIBRARY_SPACE + 30
-    const availW = window.innerWidth - left - 40
-    const availH = window.innerHeight - 60
-    const k = Math.min(1, Math.max(ZOOM_MIN, Math.min(availW / (x1 - x0), availH / (y1 - y0))))
-    setView({ k, x: left + (availW - (x1 - x0) * k) / 2 - x0 * k, y: 30 + (availH - (y1 - y0) * k) / 2 - y0 * k })
+    fitBox(x0, y0, x1, y1)
   }
 
   useEffect(() => {
-    if (loaded) fitView()
+    if (!loaded) return
+    fitView()
+    // Guía rápida la primera vez (tras encuadrar la vista, para que los resaltados caigan en su sitio)
+    let seen = true
+    try {
+      seen = localStorage.getItem(TOUR_KEY) === 'done'
+    } catch {}
+    if (!seen) {
+      const t = setTimeout(() => setTourOpen(true), 500)
+      return () => clearTimeout(t)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded])
+
+  const closeTour = useCallback(() => {
+    setTourOpen(false)
+    try {
+      localStorage.setItem(TOUR_KEY, 'done')
+    } catch {}
+  }, [])
+
+  const openTour = () => {
+    setLibraryCollapsed(false)
+    setFocus(false)
+    fitView()
+    setTimeout(() => setTourOpen(true), 50)
+  }
 
   // Pan con arrastre del fondo, rueda para desplazar, Ctrl/⌘ + rueda (o pinza) para zoom
   useEffect(() => {
@@ -371,14 +440,76 @@ export default function Editor() {
     window.addEventListener('pointerup', up)
   }
 
-  const onWorkspaceDown = (e) => {
-    if (e.target !== e.currentTarget && !e.target.dataset.backdrop) return
-    setSelected(null)
-    drag(e, (ev, dx, dy) => setView((v) => ({ ...v, x: v.x + dx, y: v.y + dy })))
+  const startGesture = () => {
+    const g = { pts: new Map() }
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
+    const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+    const move = (ev) => {
+      const prev = g.pts.get(ev.pointerId)
+      if (!prev) return
+      const cur = { x: ev.clientX, y: ev.clientY }
+      if (g.pts.size >= 2) {
+        const [[ida, pa], [, pb]] = [...g.pts.entries()]
+        const a = ida === ev.pointerId ? cur : pa
+        const b = ida === ev.pointerId ? pb : cur
+        const d0 = dist(pa, pb)
+        const m0 = mid(pa, pb)
+        const m1 = mid(a, b)
+        const f = d0 > 0 ? dist(a, b) / d0 : 1
+        // El punto bajo los dedos se mantiene bajo los dedos
+        setView((v) => {
+          const k = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v.k * f))
+          return { k, x: m1.x - ((m0.x - v.x) * k) / v.k, y: m1.y - ((m0.y - v.y) * k) / v.k }
+        })
+      } else {
+        setView((v) => ({ ...v, x: v.x + cur.x - prev.x, y: v.y + cur.y - prev.y }))
+      }
+      g.pts.set(ev.pointerId, cur)
+    }
+    // Un segundo dedo cuenta aunque caiga sobre una tarjeta
+    const down = (ev) => {
+      if (ev.pointerType === 'touch') g.pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
+    }
+    const up = (ev) => {
+      g.pts.delete(ev.pointerId)
+      if (g.pts.size === 0) {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+        window.removeEventListener('pointercancel', up)
+        window.removeEventListener('pointerdown', down, true)
+        gestureRef.current = null
+      }
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    window.addEventListener('pointerdown', down, true)
+    return g
   }
 
+  const onWorkspaceDown = (e) => {
+    if (e.target !== e.currentTarget && !e.target.dataset.backdrop) return
+    e.preventDefault()
+    setSelected(null)
+    if (!gestureRef.current) gestureRef.current = startGesture()
+    gestureRef.current.pts.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  }
+
+  const lastTapRef = useRef({ id: null, t: 0 })
   const onHeaderDown = (e, id) => {
     if (e.button !== 0) return
+    // Doble toque táctil (el dblclick no es fiable con touch-action: none). Se mide con la marca
+    // de tiempo del evento —cuándo tocó el dedo— y no con la hora de proceso, que se retrasa
+    // si el primer toque provoca un render
+    if (e.pointerType === 'touch') {
+      const now = e.timeStamp
+      if (lastTapRef.current.id === id && now - lastTapRef.current.t < 350) {
+        lastTapRef.current = { id: null, t: 0 }
+        zoomToNode(id)
+        return
+      }
+      lastTapRef.current = { id, t: now }
+    }
     setSelected(id)
     drag(e, (ev, dx, dy) => {
       const k = live.current.view.k
@@ -448,7 +579,7 @@ export default function Editor() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (isTyping(e.target)) return
+      if (isTyping(e.target) || live.current.tourOpen) return
       const { selected, focus } = live.current
       if (e.key === 'Escape') {
         if (focus) setFocus(false)
@@ -572,6 +703,7 @@ export default function Editor() {
                 imageName={imageNames[node.id]}
                 onSelect={setSelected}
                 onHeaderDown={onHeaderDown}
+                onHeaderDoubleClick={zoomToNode}
                 onToggleBypass={(id) => updateNode(id, { bypass: !byId.get(id).bypass })}
                 onDelete={deleteNode}
                 onParam={setParam}
@@ -624,11 +756,20 @@ export default function Editor() {
         <Library
           collapsed={libraryCollapsed}
           onToggle={() => setLibraryCollapsed((v) => !v)}
-          onAdd={(type) => addNode(type)}
+          onAdd={(type) => {
+            addNode(type)
+            if (isMobile) {
+              setLibraryCollapsed(true)
+              setTimeout(() => fitView(), 0)
+            }
+          }}
           onFit={fitView}
           onReset={resetCanvas}
+          onHelp={openTour}
         />
       )}
+
+      <Onboarding open={tourOpen} onClose={closeTour} />
 
       {!outputNode && <p className={s.warning}>Falta el nodo de salida</p>}
     </div>

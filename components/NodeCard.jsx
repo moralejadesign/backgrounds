@@ -18,6 +18,7 @@ export default function NodeCard({
   imageName,
   onSelect,
   onHeaderDown,
+  onHeaderDoubleClick,
   onToggleBypass,
   onDelete,
   onParam,
@@ -39,10 +40,17 @@ export default function NodeCard({
   return (
     <div
       className={`${s.card} ${selected ? s.selected : ''} ${node.bypass ? s.bypassed : ''}`}
+      data-tour={isOutput ? 'output' : 'node'}
       style={{ left: node.x, top: node.y, width }}
       onPointerDown={() => onSelect(node.id)}
     >
-      <header className={s.header} style={{ height: HEADER_H }} onPointerDown={(e) => onHeaderDown(e, node.id)}>
+      <header
+        className={s.header}
+        style={{ height: HEADER_H }}
+        onPointerDown={(e) => onHeaderDown(e, node.id)}
+        onDoubleClick={() => onHeaderDoubleClick?.(node.id)}
+        title="Doble clic para acercar"
+      >
         <span className={s.grip} aria-hidden="true" />
         <span className={s.title}>{def.title}</span>
         {headerExtra}
@@ -159,6 +167,7 @@ export default function NodeCard({
       {!isOutput && (
         <span
           className={`${s.port} ${s.portOut}`}
+          data-tour="port-out"
           style={{ top: HEADER_H + ph / 2 }}
           onPointerDown={(e) => onOutDown(e, node.id)}
           title="Salida: arrastra hasta la entrada de otro nodo"
