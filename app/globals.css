@@ -1,5 +1,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
+/* El reset de Tailwind sube el interlineado a 1.5; la app está diseñada con el normal */
+html { line-height: normal; }
 
 :root {
   --cream: #f7ecd4;
@@ -17,4 +19,10 @@ body {
   color: var(--text);
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
+}
+
+/* Familias de la app (pisan las de Tailwind por defecto) */
+:root {
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-inter-tight);
 }

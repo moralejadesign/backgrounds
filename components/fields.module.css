@@ -72,8 +72,9 @@
   color: var(--cream);
   font-family: var(--font-display), var(--font-sans), sans-serif;
   font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   text-align: left;
   cursor: pointer;
 }

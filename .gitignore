@@ -3,3 +3,6 @@ node_modules
 out
 next-env.d.ts
 .DS_Store
+
+# Archivos de la fuente con licencia (escritorio y certificado); la web usa app/fonts
+/public/Monoblock/
