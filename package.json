@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "mp4-muxer": "^5.2.2",
     "next": "^16.3.8",
     "react": "^19.3.0",

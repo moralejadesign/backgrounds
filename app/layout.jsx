@@ -1,4 +1,5 @@
 import { Inter, Inter_Tight } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 const display = Inter_Tight({ subsets: ['latin'], weight: ['500', '600'], variable: '--font-display' })
@@ -19,7 +20,10 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es" className={`${display.variable} ${sans.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   )
 }
