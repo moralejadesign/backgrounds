@@ -40,10 +40,10 @@
   flex: 1;
   color: #fff;
   font-family: var(--font-display), var(--font-sans), sans-serif;
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
+  letter-spacing: 0;
+  line-height: 1.15;
 }
 .addLayer {
   display: none;

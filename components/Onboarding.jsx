@@ -7,7 +7,7 @@ import s from './Onboarding.module.css'
 // target = selector del elemento a resaltar (sin target, la tarjeta va centrada).
 const STEPS = [
   {
-    title: 'Bienvenido a Croma Backgrounds',
+    title: 'Bienvenido a COOOOL BACKGROUNDS MAKER',
     text: 'Crea fondos combinando capas. Toda la página es un lienzo: cada tarjeta es una capa y los cables llevan la imagen de una a otra, hasta la salida.',
   },
   {

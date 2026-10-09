@@ -57,6 +57,7 @@
   fill: none;
   stroke: transparent;
   stroke-width: 16;
+  vector-effect: non-scaling-stroke; /* zona de toque constante con cualquier zoom */
   pointer-events: stroke;
   cursor: pointer;
 }
@@ -172,4 +173,18 @@
   transform: translateX(-50%);
   color: var(--text);
   font-family: var(--font-sans), sans-serif;
+}
+
+/* Táctil: cables más fáciles de tocar y × del tamaño de un dedo */
+@media (pointer: coarse) {
+  .wireHit {
+    stroke-width: 28;
+  }
+  .cut {
+    width: 36px;
+    height: 36px;
+    margin: -18px 0 0 -18px;
+    font-size: 20px;
+    line-height: 36px;
+  }
 }

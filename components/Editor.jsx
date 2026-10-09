@@ -65,6 +65,8 @@ export default function Editor() {
   const [selected, setSelected] = useState(null)
   const [connecting, setConnecting] = useState(null) // { from, x, y } en coordenadas del lienzo
   const [hoverEdge, setHoverEdge] = useState(null)
+  // Cable seleccionado con toque/clic: su × queda visible (en móvil no hay hover)
+  const [selectedEdge, setSelectedEdge] = useState(null)
   const [focus, setFocus] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [exportProgress, setExportProgress] = useState(null)
@@ -94,7 +96,7 @@ export default function Editor() {
 
   // Estado vigente para callbacks estables (gestos, loop de dibujo)
   const live = useRef({})
-  live.current = { graph, view, focus, format, duration, playing, selected, libraryCollapsed, tourOpen, isMobile }
+  live.current = { graph, view, focus, format, duration, playing, selected, selectedEdge, libraryCollapsed, tourOpen, isMobile }
 
   const loopT = () => (timeRef.current % live.current.duration) / live.current.duration
 
@@ -491,6 +493,7 @@ export default function Editor() {
     if (e.target !== e.currentTarget && !e.target.dataset.backdrop) return
     e.preventDefault()
     setSelected(null)
+    setSelectedEdge(null)
     if (!gestureRef.current) gestureRef.current = startGesture()
     gestureRef.current.pts.set(e.pointerId, { x: e.clientX, y: e.clientY })
   }
@@ -580,10 +583,15 @@ export default function Editor() {
   useEffect(() => {
     const onKey = (e) => {
       if (isTyping(e.target) || live.current.tourOpen) return
-      const { selected, focus } = live.current
+      const { selected, selectedEdge, focus } = live.current
       if (e.key === 'Escape') {
         if (focus) setFocus(false)
         setConnecting(null)
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEdge && !focus) {
+        e.preventDefault()
+        const [to, port] = selectedEdge.split(':')
+        removeEdge({ to, port })
+        setSelectedEdge(null)
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selected && !focus) {
         e.preventDefault()
         deleteNode(selected)
@@ -647,8 +655,19 @@ export default function Editor() {
               const key = `${e.to}:${e.port}`
               return (
                 <g key={key} onPointerEnter={() => setHoverEdge(key)} onPointerLeave={() => setHoverEdge(null)}>
-                  <path className={s.wireHit} d={wirePath(a, b)} />
-                  <path className={`${s.wire} ${hoverEdge === key ? s.wireHover : ''}`} d={wirePath(a, b)} />
+                  <path
+                    className={s.wireHit}
+                    d={wirePath(a, b)}
+                    onPointerDown={(ev) => {
+                      ev.stopPropagation()
+                      setSelected(null)
+                      setSelectedEdge(key)
+                    }}
+                  />
+                  <path
+                    className={`${s.wire} ${hoverEdge === key || selectedEdge === key ? s.wireHover : ''}`}
+                    d={wirePath(a, b)}
+                  />
                 </g>
               )
             })}
@@ -663,7 +682,7 @@ export default function Editor() {
           {/* Botón para quitar el cable bajo el puntero */}
           {graph.edges.map((e) => {
             const key = `${e.to}:${e.port}`
-            if (hoverEdge !== key) return null
+            if (hoverEdge !== key && selectedEdge !== key) return null
             const from = byId.get(e.from)
             const to = byId.get(e.to)
             if (!from || !to) return null
@@ -673,12 +692,13 @@ export default function Editor() {
                 key={key}
                 type="button"
                 className={s.cut}
-                style={{ left: m.x, top: m.y }}
+                style={{ left: m.x, top: m.y, transform: `scale(${1 / view.k})` }}
                 onPointerEnter={() => setHoverEdge(key)}
                 onPointerDown={(ev) => ev.stopPropagation()}
                 onClick={() => {
                   removeEdge(e)
                   setHoverEdge(null)
+                  setSelectedEdge(null)
                 }}
                 aria-label="Desconectar"
                 title="Desconectar"
@@ -701,7 +721,10 @@ export default function Editor() {
                 connectedInputs={connectedInputs(node.id)}
                 connecting={Boolean(connecting) && connecting.from !== node.id}
                 imageName={imageNames[node.id]}
-                onSelect={setSelected}
+                onSelect={(id) => {
+                  setSelected(id)
+                  setSelectedEdge(null)
+                }}
                 onHeaderDown={onHeaderDown}
                 onHeaderDoubleClick={zoomToNode}
                 onToggleBypass={(id) => updateNode(id, { bypass: !byId.get(id).bypass })}

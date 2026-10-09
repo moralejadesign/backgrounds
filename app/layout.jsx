@@ -5,7 +5,7 @@ const display = Inter_Tight({ subsets: ['latin'], weight: ['500', '600'], variab
 const sans = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-sans' })
 
 export const metadata = {
-  title: 'Croma Backgrounds',
+  title: 'COOOOL BACKGROUNDS MAKER',
   description: 'Generador de fondos abstractos con shaders GLSL',
 }
 

@@ -32,7 +32,7 @@ export default function Library({ collapsed, onToggle, onAdd, onFit, onReset, on
     <aside className={`${s.panel} ${collapsed ? s.collapsed : ''}`} data-tour="library">
       <div className={s.brand}>
         <Logo className={s.logo} />
-        <span className={s.name}>Croma Backgrounds</span>
+        <span className={s.name}>COOOOL BACKGROUNDS MAKER</span>
         {/* En móvil, la barra inferior muestra "Añadir capa" en lugar de la flecha */}
         <button type="button" className={s.addLayer} onClick={onToggle} aria-expanded={!collapsed}>
           {collapsed ? '+ Añadir capa' : 'Cerrar'}
