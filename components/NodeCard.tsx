@@ -1,13 +1,35 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { ParamControls } from './fields'
 import { HEADER_H, nodeWidth, previewHeight } from '@/lib/nodes/graph'
+import type { GraphNode, NodeDef, ParamValue } from '@/lib/nodes/types'
 import s from './NodeCard.module.css'
 
 // Tarjeta de un nodo. El área de preview es transparente: el lienzo WebGL de fondo dibuja
 // ahí la textura del nodo (ver Editor). Los puertos se colocan con la misma geometría que
-// usan los cables (lib/nodes/graph.js).
+// usan los cables (lib/nodes/graph.ts).
+interface NodeCardProps {
+  node: GraphNode
+  def: NodeDef
+  aspect: number
+  selected: boolean
+  connectedInputs: Set<string>
+  connecting: boolean
+  imageName?: string
+  onSelect: (id: string) => void
+  onHeaderDown: (e: PointerEvent, id: string) => void
+  onHeaderDoubleClick?: (id: string) => void
+  onToggleBypass: (id: string) => void
+  onDelete: (id: string) => void
+  onParam: (id: string, key: string, value: ParamValue) => void
+  onOutDown: (e: PointerEvent, id: string) => void
+  onInDown: (e: PointerEvent, id: string, port: string) => void
+  onFile: (id: string, file: File) => void
+  headerExtra?: ReactNode
+  children?: ReactNode
+}
+
 export default function NodeCard({
   node,
   def,
@@ -27,10 +49,10 @@ export default function NodeCard({
   onFile,
   headerExtra,
   children,
-}) {
+}: NodeCardProps) {
   const [tab, setTab] = useState(0)
   const [collapsed, setCollapsed] = useState(false)
-  const fileRef = useRef(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const width = nodeWidth(node)
   const ph = previewHeight(node, aspect)
   const groups = def.groups

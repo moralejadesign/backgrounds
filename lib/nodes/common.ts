@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { Control, ControlGroup, NodeDef, Option, Params, ParamValue, Uniforms } from './types'
 
 // Base compartida por todos los nodos del grafo.
 // Cada nodo renderiza la imagen completa a una textura; sus entradas son las texturas
@@ -68,7 +69,7 @@ vec3 blendMode(vec3 b, vec3 t, int m) {
 }
 `
 
-export const commonUniforms = () => ({
+export const commonUniforms = (): Uniforms => ({
   uAspect: { value: 1 },
   uGrainRes: { value: new THREE.Vector2(1, 1) },
   uInput: { value: null },
@@ -78,22 +79,22 @@ export const commonUniforms = () => ({
 })
 
 // Los inputs de color entregan hex sRGB; se pasan tal cual al shader
-export function hexToVec3(hex) {
+export function hexToVec3(hex: string) {
   const n = parseInt(hex.slice(1, 7), 16)
   return new THREE.Vector3(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255)
 }
 
 export const colorUniform = (n = 4) => ({ value: Array.from({ length: n }, () => new THREE.Vector3()) })
 
-export function setColors(uniform, hexes) {
+export function setColors(uniform: THREE.IUniform<THREE.Vector3[]>, hexes: string[]) {
   hexes.forEach((c, i) => uniform.value[i].copy(hexToVec3(c)))
 }
 
-export const defaultsOf = (def) =>
+export const defaultsOf = (def: NodeDef): Params =>
   Object.fromEntries(def.groups.flatMap((g) => g.controls.map((c) => [c.key, c.value])))
 
 // --- Fusión ---
-export const BLEND_MODES = [
+export const BLEND_MODES: Option[] = [
   ['normal', 'Normal'],
   ['screen', 'Trama'],
   ['multiply', 'Multiplicar'],
@@ -103,16 +104,20 @@ export const BLEND_MODES = [
   ['difference', 'Diferencia'],
   ['lighten', 'Aclarar'],
 ]
-export const blendIndex = (mode) => Math.max(0, BLEND_MODES.findIndex(([v]) => v === mode))
+export const blendIndex = (mode: string) => Math.max(0, BLEND_MODES.findIndex(([v]) => v === mode))
 
 // activeWhen: [clave, valor] — el control se atenúa cuando no aplica (p. ej. fusión solo en modo "Encima")
-export const blendControls = ({ blend = 'normal', opacity = 1, activeWhen } = {}) => [
+export const blendControls = ({
+  blend = 'normal',
+  opacity = 1,
+  activeWhen,
+}: { blend?: string; opacity?: number; activeWhen?: readonly [string, ParamValue] } = {}): Control[] => [
   { key: 'blend', label: 'fusión', type: 'select', value: blend, options: BLEND_MODES, activeWhen },
   { key: 'opacity', label: 'opacidad', value: opacity, min: 0, max: 1, step: 0.01 },
 ]
 
 // --- Movimiento por nodo (la duración y los fps son globales, en el nodo de salida) ---
-export const animationGroup = (motions) => ({
+export const animationGroup = (motions: Option[]): ControlGroup => ({
   id: 'animation',
   title: 'Animación',
   controls: [
@@ -124,5 +129,5 @@ export const animationGroup = (motions) => ({
 
 // Movimientos que empalman en t = 1: vueltas completas o vaivenes senoidales
 export const TAU = Math.PI * 2
-export const turn = (base, t, cycles, full = 360) => base + full * cycles * t
-export const breathe = (base, t, cycles, amplitude) => base + amplitude * Math.sin(TAU * cycles * t)
+export const turn = (base: number, t: number, cycles: number, full = 360) => base + full * cycles * t
+export const breathe = (base: number, t: number, cycles: number, amplitude: number) => base + amplitude * Math.sin(TAU * cycles * t)

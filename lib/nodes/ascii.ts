@@ -1,11 +1,12 @@
 import * as THREE from 'three'
 import { HEADER, hexToVec3 } from './common'
+import type { NodeDef } from './types'
 
 // ASCII: la imagen de entrada se convierte en una rejilla de caracteres. Cada celda toma
 // la luminancia de su centro y elige el carácter de densidad equivalente en un atlas
 // (los glifos dibujados una vez en una tira de canvas).
 
-const CHARSETS = {
+const CHARSETS: Record<string, string> = {
   standard: ' .:-=+*#%@',
   detailed: " .'`^\",:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
   blocks: ' ░▒▓█',
@@ -17,14 +18,15 @@ const GLYPH_W = 40 // proporción ~0,6 de una fuente monoespaciada
 const GLYPH_H = 64
 
 // Un atlas por juego de caracteres, compartido por el editor y el export
-const atlases = new Map()
-function atlasFor(set) {
-  if (atlases.has(set)) return atlases.get(set)
+const atlases = new Map<string, { texture: THREE.CanvasTexture; count: number }>()
+function atlasFor(set: string) {
+  const cached = atlases.get(set)
+  if (cached) return cached
   const chars = [...CHARSETS[set]]
   const canvas = document.createElement('canvas')
   canvas.width = GLYPH_W * chars.length
   canvas.height = GLYPH_H
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d')!
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = '#fff'
@@ -45,7 +47,7 @@ function atlasFor(set) {
 
 const COLOR_MODES = ['image', 'white', 'duotone']
 
-export const ascii = {
+export const ascii: NodeDef = {
   type: 'ascii',
   title: 'ASCII',
   category: 'effect',

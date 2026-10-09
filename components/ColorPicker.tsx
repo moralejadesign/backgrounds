@@ -1,14 +1,39 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import s from './ColorPicker.module.css'
 
 // --- Conversión de color ---------------------------------------------------
 
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
+interface Rgb {
+  r: number
+  g: number
+  b: number
+}
+interface Hsv {
+  h: number
+  s: number
+  v: number
+}
+type ColorMode = 'hex' | 'rgb' | 'hsl'
 
-export function hexToRgb(hex) {
+interface Hsl {
+  h: number
+  s: number
+  l: number
+}
+
+// API EyeDropper (Chromium): aún no está en los tipos del DOM
+declare global {
+  interface Window {
+    EyeDropper: new () => { open: () => Promise<{ sRGBHex: string }> }
+  }
+}
+
+const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
+
+export function hexToRgb(hex: string): Rgb | null {
   const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(hex.trim())
   if (!m) return null
   let h = m[1]
@@ -16,9 +41,9 @@ export function hexToRgb(hex) {
   const n = parseInt(h, 16)
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
 }
-const rgbToHex = ({ r, g, b }) => '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')
+const rgbToHex = ({ r, g, b }: Rgb) => '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')
 
-function rgbToHsv({ r, g, b }) {
+function rgbToHsv({ r, g, b }: Rgb): Hsv {
   r /= 255
   g /= 255
   b /= 255
@@ -34,15 +59,15 @@ function rgbToHsv({ r, g, b }) {
   return { h, s: max ? d / max : 0, v: max }
 }
 
-function hsvToRgb({ h, s, v }) {
-  const f = (n) => {
+function hsvToRgb({ h, s, v }: Hsv): Rgb {
+  const f = (n: number) => {
     const k = (n + h / 60) % 6
     return v - v * s * Math.max(0, Math.min(k, 4 - k, 1))
   }
   return { r: f(5) * 255, g: f(3) * 255, b: f(1) * 255 }
 }
 
-function rgbToHsl({ r, g, b }) {
+function rgbToHsl({ r, g, b }: Rgb): Hsl {
   r /= 255
   g /= 255
   b /= 255
@@ -55,9 +80,9 @@ function rgbToHsl({ r, g, b }) {
   return { h, s, l }
 }
 
-function hslToRgb({ h, s, l }) {
+function hslToRgb({ h, s, l }: Hsl): Rgb {
   const a = s * Math.min(l, 1 - l)
-  const f = (n) => {
+  const f = (n: number) => {
     const k = (n + h / 30) % 12
     return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))
   }
@@ -69,15 +94,15 @@ function hslToRgb({ h, s, l }) {
 const SAVED_KEY = 'croma-saved-colors'
 const DEFAULT_SAVED = ['#4ea35a', '#3d6ee8', '#4b45d8', '#8a3fe0', '#b93ad1', '#d03f7d', '#cf3c35', '#e0682b', '#f6e9dc', '#0a0a0a']
 
-function readSaved() {
+function readSaved(): string[] {
   try {
-    const v = JSON.parse(localStorage.getItem(SAVED_KEY))
+    const v = JSON.parse(localStorage.getItem(SAVED_KEY) ?? 'null')
     return Array.isArray(v) ? v : DEFAULT_SAVED
   } catch {
     return DEFAULT_SAVED
   }
 }
-function writeSaved(list) {
+function writeSaved(list: string[]) {
   try {
     localStorage.setItem(SAVED_KEY, JSON.stringify(list))
   } catch {}
@@ -85,19 +110,19 @@ function writeSaved(list) {
 
 // --- Arrastre con captura de puntero ---------------------------------------
 
-function usePointerArea(onPick) {
-  const ref = useRef(null)
-  const pick = (e) => {
-    const r = ref.current.getBoundingClientRect()
+function usePointerArea(onPick: (x: number, y: number) => void) {
+  const ref = useRef<HTMLDivElement>(null)
+  const pick = (e: PointerEvent) => {
+    const r = ref.current!.getBoundingClientRect()
     onPick(clamp((e.clientX - r.left) / r.width, 0, 1), clamp((e.clientY - r.top) / r.height, 0, 1))
   }
-  const onPointerDown = (e) => {
+  const onPointerDown = (e: PointerEvent) => {
     e.preventDefault()
-    ref.current.setPointerCapture(e.pointerId)
+    ref.current!.setPointerCapture(e.pointerId)
     pick(e)
   }
-  const onPointerMove = (e) => {
-    if (ref.current.hasPointerCapture(e.pointerId)) pick(e)
+  const onPointerMove = (e: PointerEvent) => {
+    if (ref.current!.hasPointerCapture(e.pointerId)) pick(e)
   }
   return { ref, onPointerDown, onPointerMove }
 }
@@ -107,15 +132,23 @@ function usePointerArea(onPick) {
 const POPOVER_W = 288
 const POPOVER_H = 470
 
-export default function ColorPicker({ value, onChange, anchorRef, onClose, label }) {
+interface ColorPickerProps {
+  value: string
+  onChange: (hex: string) => void
+  anchorRef: RefObject<HTMLElement | null>
+  onClose: () => void
+  label: string
+}
+
+export default function ColorPicker({ value, onChange, anchorRef, onClose, label }: ColorPickerProps) {
   const rgb = hexToRgb(value) ?? { r: 0, g: 0, b: 0 }
   // El tono se guarda aparte: en grises (saturación 0) no se pierde al mover el área
   const [hsv, setHsv] = useState(() => rgbToHsv(rgb))
-  const [mode, setMode] = useState('hex')
+  const [mode, setMode] = useState<ColorMode>('hex')
   const [hexDraft, setHexDraft] = useState(value.toUpperCase())
   const [saved, setSaved] = useState(DEFAULT_SAVED)
-  const [pos, setPos] = useState(null)
-  const popRef = useRef(null)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+  const popRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => setSaved(readSaved()), [])
 
@@ -130,11 +163,11 @@ export default function ColorPicker({ value, onChange, anchorRef, onClose, label
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
 
-  const emitHsv = (next) => {
+  const emitHsv = (next: Hsv) => {
     setHsv(next)
     onChange(rgbToHex(hsvToRgb(next)))
   }
-  const emitHex = (hex) => {
+  const emitHex = (hex: string) => {
     const c = hexToRgb(hex)
     if (!c) return
     const next = rgbToHsv(c)
@@ -162,11 +195,12 @@ export default function ColorPicker({ value, onChange, anchorRef, onClose, label
 
   // Cerrar con clic fuera o Escape
   useEffect(() => {
-    const onDown = (e) => {
-      if (popRef.current?.contains(e.target) || anchorRef.current?.contains(e.target)) return
+    const onDown = (e: globalThis.PointerEvent) => {
+      const target = e.target as Node
+      if (popRef.current?.contains(target) || anchorRef.current?.contains(target)) return
       onClose()
     }
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
         onClose()
@@ -196,7 +230,7 @@ export default function ColorPicker({ value, onChange, anchorRef, onClose, label
     setSaved(list)
     writeSaved(list)
   }
-  const removeSaved = (hex) => {
+  const removeSaved = (hex: string) => {
     const list = saved.filter((c) => c !== hex)
     setSaved(list)
     writeSaved(list)
@@ -204,8 +238,8 @@ export default function ColorPicker({ value, onChange, anchorRef, onClose, label
 
   const hueColor = rgbToHex(hsvToRgb({ h: hsv.h, s: 1, v: 1 }))
   const hsl = rgbToHsl(rgb)
-  const setRgbPart = (k, v) => emitHex(rgbToHex({ ...rgb, [k]: clamp(Number(v) || 0, 0, 255) }))
-  const setHslPart = (k, v) => {
+  const setRgbPart = (k: keyof Rgb, v: string) => emitHex(rgbToHex({ ...rgb, [k]: clamp(Number(v) || 0, 0, 255) }))
+  const setHslPart = (k: keyof Hsl, v: string) => {
     const max = k === 'h' ? 360 : 100
     const next = { ...hsl, [k]: clamp(Number(v) || 0, 0, max) / (k === 'h' ? 1 : 100) }
     emitHex(rgbToHex(hslToRgb(next)))
@@ -252,7 +286,7 @@ export default function ColorPicker({ value, onChange, anchorRef, onClose, label
 
       <div className={s.row}>
         <span className={s.modeWrap}>
-          <select className={s.mode} value={mode} onChange={(e) => setMode(e.target.value)} aria-label="Formato del color">
+          <select className={s.mode} value={mode} onChange={(e) => setMode(e.target.value as ColorMode)} aria-label="Formato del color">
             <option value="hex">Hex</option>
             <option value="rgb">RGB</option>
             <option value="hsl">HSL</option>
@@ -278,7 +312,7 @@ export default function ColorPicker({ value, onChange, anchorRef, onClose, label
             />
           )}
           {mode === 'rgb' &&
-            ['r', 'g', 'b'].map((k) => (
+            (['r', 'g', 'b'] as const).map((k) => (
               <input
                 key={k}
                 className={s.num}
@@ -291,11 +325,13 @@ export default function ColorPicker({ value, onChange, anchorRef, onClose, label
               />
             ))}
           {mode === 'hsl' &&
-            [
-              ['h', Math.round(hsl.h), 360],
-              ['s', Math.round(hsl.s * 100), 100],
-              ['l', Math.round(hsl.l * 100), 100],
-            ].map(([k, v, max]) => (
+            (
+              [
+                ['h', Math.round(hsl.h), 360],
+                ['s', Math.round(hsl.s * 100), 100],
+                ['l', Math.round(hsl.l * 100), 100],
+              ] as const
+            ).map(([k, v, max]) => (
               <input
                 key={k}
                 className={s.num}

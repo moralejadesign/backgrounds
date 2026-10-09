@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { HEADER, DEG, colorUniform, setColors, animationGroup, breathe, turn, TAU } from './common'
+import type { NodeDef } from './types'
 
 // ---------------------------------------------------------------------------
 // Gradiente: luz elíptica (la base del antiguo efecto Glass), lineal o malla
@@ -7,7 +8,7 @@ import { HEADER, DEG, colorUniform, setColors, animationGroup, breathe, turn, TA
 
 const GRADIENT_TYPES = ['light', 'linear', 'mesh']
 
-export const gradient = {
+export const gradient: NodeDef = {
   type: 'gradient',
   title: 'Gradiente',
   category: 'source',
@@ -159,7 +160,7 @@ void main() {
 // Imagen: archivo del usuario, encuadrado para cubrir el formato
 // ---------------------------------------------------------------------------
 
-export const image = {
+export const image: NodeDef = {
   type: 'image',
   title: 'Imagen',
   category: 'source',

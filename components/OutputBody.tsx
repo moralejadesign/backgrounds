@@ -1,10 +1,26 @@
 'use client'
 
+import type { CSSProperties, RefObject } from 'react'
 import { FormatPicker, Slider, SelectField } from './fields'
+import type { OutputSettings } from '@/lib/nodes/types'
 import { formats } from '@/lib/formats'
 import s from './OutputBody.module.css'
 
 // Cuerpo del nodo de salida: formato, línea de tiempo global y exportación
+interface OutputBodyProps {
+  output: OutputSettings
+  onOutput: (patch: Partial<OutputSettings>) => void
+  playing: boolean
+  onTogglePlay: () => void
+  onScrub: (t: number) => void
+  progressRef: RefObject<HTMLInputElement | null>
+  timeLabelRef: RefObject<HTMLSpanElement | null>
+  onExportPNG: () => void
+  onExportMP4: () => void
+  exportProgress: number | null
+  videoSupported: boolean
+}
+
 export default function OutputBody({
   output,
   onOutput,
@@ -17,7 +33,7 @@ export default function OutputBody({
   onExportMP4,
   exportProgress,
   videoSupported,
-}) {
+}: OutputBodyProps) {
   const busy = exportProgress !== null
   return (
     <div className={s.body}>
@@ -43,7 +59,7 @@ export default function OutputBody({
           max="1000"
           step="1"
           defaultValue="0"
-          onInput={(e) => onScrub(Number(e.target.value) / 1000)}
+          onInput={(e) => onScrub(Number(e.currentTarget.value) / 1000)}
           aria-label="Posición en el loop"
         />
         <span ref={timeLabelRef} className={s.time} />
@@ -74,7 +90,7 @@ export default function OutputBody({
         <button
           type="button"
           className={`${s.primary} ${busy ? s.busy : ''}`}
-          style={{ '--progress': exportProgress ?? 0 }}
+          style={{ '--progress': exportProgress ?? 0 } as CSSProperties}
           onClick={onExportMP4}
           disabled={busy || !videoSupported}
           title={videoSupported ? undefined : 'Este navegador no soporta exportar video (WebCodecs)'}

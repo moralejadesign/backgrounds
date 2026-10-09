@@ -1,5 +1,13 @@
 // Formatos de salida: el preview adopta la proporción y el PNG se exporta al tamaño real
-export const formats = [
+export interface Format {
+  id: string
+  ratio: string
+  name: string
+  w: number
+  h: number
+}
+
+export const formats: Format[] = [
   { id: 'og', ratio: '1.91:1', name: 'Open Graph', w: 1200, h: 630 },
   { id: 'wide', ratio: '16:9', name: 'Horizontal', w: 1920, h: 1080 },
   { id: 'classic', ratio: '3:2', name: 'Clásico', w: 1800, h: 1200 },

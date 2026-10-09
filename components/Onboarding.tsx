@@ -1,11 +1,26 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import s from './Onboarding.module.css'
 
 // Guía rápida: resalta cada parte real de la interfaz con una tarjeta al lado.
 // target = selector del elemento a resaltar (sin target, la tarjeta va centrada).
-const STEPS = [
+interface Step {
+  title: string
+  text: string
+  target?: string
+  pad?: number
+  keys?: string[]
+}
+
+interface Rect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+const STEPS: Step[] = [
   {
     title: 'Bienvenido a COOOOL BACKGROUNDS MAKER',
     text: 'Crea fondos combinando capas. Toda la página es un lienzo: cada tarjeta es una capa y los cables llevan la imagen de una a otra, hasta la salida.',
@@ -41,9 +56,9 @@ const STEPS = [
 const CARD_W = 340
 const MARGIN = 16
 
-export default function Onboarding({ open, onClose }) {
+export default function Onboarding({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [step, setStep] = useState(0)
-  const [rect, setRect] = useState(null)
+  const [rect, setRect] = useState<Rect | null>(null)
   const current = STEPS[step]
   const last = step === STEPS.length - 1
 
@@ -68,7 +83,7 @@ export default function Onboarding({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
       else if (e.key === 'ArrowRight' || e.key === 'Enter') last ? onClose() : setStep((v) => v + 1)
       else if (e.key === 'ArrowLeft') setStep((v) => Math.max(0, v - 1))
@@ -86,7 +101,7 @@ export default function Onboarding({ open, onClose }) {
   // En pantallas estrechas ocupa el ancho y se acopla arriba o abajo, lejos del objetivo.
   const narrow = window.innerWidth < 600
   const width = narrow ? window.innerWidth - 24 : CARD_W
-  let cardStyle = { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }
+  let cardStyle: CSSProperties = { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }
   if (narrow) {
     const targetLow = rect && rect.y + rect.h / 2 > window.innerHeight / 2
     cardStyle = rect

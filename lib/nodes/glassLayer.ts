@@ -1,4 +1,5 @@
 import { DEG } from './common'
+import type { Control, ControlGroup, Params, ParamValue, Uniforms } from './types'
 
 // Capa de vidrio acanalado, compartida por los efectos.
 // Cada efecto: añade glassGroup() a sus grupos, inserta glassGLSL después de su función rot(),
@@ -9,28 +10,44 @@ const DIST_SHAPES = ['prism', 'lens', 'contour', 'cascade', 'flat']
 
 // Controles extra (curvatura, irregularidad, escalonado): solo los efectos que los piden los muestran;
 // en los demás los uniforms quedan en valores neutros y no cambian nada
-const EXTRA_CONTROLS = [
+const EXTRA_CONTROLS: Control[] = [
   { key: 'glassCurve', label: 'curvatura', value: 1, min: 0.2, max: 4, step: 0.01, dependsOn: 'glassOn' },
   { key: 'glassIrregular', label: 'irregularidad', value: 0, min: 0, max: 1, step: 0.01, dependsOn: 'glassOn' },
   { key: 'glassSlide', label: 'escalonado', value: 0, min: -1, max: 1, step: 0.01, dependsOn: 'glassOn' },
 ]
 
 // hide: controles que el efecto fija con su valor por defecto y no muestra en el panel
-export const glassGroup = ({ title = 'Vidrio', on = true, extras = false, defaults = {}, hide = [] } = {}) => {
+export const glassGroup = ({
+  title = 'Vidrio',
+  on = true,
+  extras = false,
+  defaults = {},
+  hide = [],
+}: {
+  title?: string
+  on?: boolean
+  extras?: boolean
+  defaults?: Record<string, ParamValue>
+  hide?: string[]
+} = {}): ControlGroup => {
   const controls = [...BASE_CONTROLS(on)]
   if (extras) controls.splice(controls.findIndex((c) => c.key === 'glassDistortion') + 1, 0, ...EXTRA_CONTROLS)
   return {
     id: 'glassLayer',
     title,
-    controls: controls.map((c) => ({
-      ...c,
-      ...(c.key in defaults && { value: defaults[c.key] }),
-      ...(hide.includes(c.key) && { hidden: true }),
-    })),
+    controls: controls.map(
+      (c) =>
+        // el valor por defecto es del mismo tipo que el del control
+        ({
+          ...c,
+          ...(c.key in defaults && { value: defaults[c.key] }),
+          ...(hide.includes(c.key) && { hidden: true }),
+        }) as Control,
+    ),
   }
 }
 
-const BASE_CONTROLS = (on) => [
+const BASE_CONTROLS = (on: boolean): Control[] => [
     { key: 'glassOn', label: 'activar', type: 'toggle', value: on },
     { key: 'glassShadows', label: 'sombras', value: 0.57, min: 0, max: 1, step: 0.01, dependsOn: 'glassOn' },
     { key: 'glassHighlights', label: 'brillos', value: 0.76, min: 0, max: 1, step: 0.01, dependsOn: 'glassOn' },
@@ -154,7 +171,7 @@ vec3 glassApply(vec3 col, float shade, float hl) {
 }
 `
 
-export const glassUniforms = () => ({
+export const glassUniforms = (): Uniforms => ({
   uGlassOn: { value: 0 },
   uGlassShape: { value: 0 },
   uGlassDistShape: { value: 0 },
@@ -171,7 +188,7 @@ export const glassUniforms = () => ({
   uGlassPhase: { value: 0 },
 })
 
-export function applyGlass(u, p) {
+export function applyGlass(u: Uniforms, p: Params) {
   u.uGlassOn.value = p.glassOn ? 1 : 0
   u.uGlassShape.value = SHAPES.indexOf(p.glassShape)
   u.uGlassDistShape.value = DIST_SHAPES.indexOf(p.glassDistShape)

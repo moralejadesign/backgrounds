@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Logo from './Logo'
 import { NODE_TYPES, LIBRARY } from '@/lib/nodes'
 import s from './Library.module.css'
 
 // Glifo pequeño por categoría
-const GLYPHS = {
+const GLYPHS: Record<string, ReactNode> = {
   source: <circle cx="12" cy="12" r="6" />,
   effect: <path d="M5 19V5m4.7 14V5m4.6 14V5M19 19V5" />,
   filter: <path d="M5 6h14l-5 6.5V18l-4 1.5v-7z" />,
@@ -20,7 +20,16 @@ const GLYPHS = {
   ),
 }
 
-export default function Library({ collapsed, onToggle, onAdd, onFit, onReset, onHelp }) {
+interface LibraryProps {
+  collapsed: boolean
+  onToggle: () => void
+  onAdd: (type: string) => void
+  onFit: () => void
+  onReset: () => void
+  onHelp: () => void
+}
+
+export default function Library({ collapsed, onToggle, onAdd, onFit, onReset, onHelp }: LibraryProps) {
   const [confirmReset, setConfirmReset] = useState(false)
   useEffect(() => {
     if (!confirmReset) return
@@ -73,7 +82,7 @@ export default function Library({ collapsed, onToggle, onAdd, onFit, onReset, on
                     >
                       <span className={s.glyph}>
                         <svg viewBox="0 0 24 24" aria-hidden="true">
-                          {GLYPHS[def.glyph] ?? GLYPHS[def.category]}
+                          {(def.glyph && GLYPHS[def.glyph]) ?? GLYPHS[def.category]}
                         </svg>
                       </span>
                       <span className={s.itemText}>

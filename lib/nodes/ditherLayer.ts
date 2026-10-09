@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { hexToVec3 } from './common'
+import type { ControlGroup, Params, Uniforms } from './types'
 
 // Capa de dithering compartida por los efectos (y por la composición tras el desenfoque).
 // Cada efecto: añade ditherGroup() a sus grupos, inserta ditherGLSL en su shader y llama a
@@ -8,7 +9,7 @@ import { hexToVec3 } from './common'
 const PATTERNS = ['bayer4', 'bayer8', 'noise', 'halftone']
 const MODES = ['duotone', 'mono', 'color']
 
-export const ditherGroup = () => ({
+export const ditherGroup = (): ControlGroup => ({
   id: 'ditherLayer',
   title: 'Dithering',
   controls: [
@@ -97,7 +98,7 @@ vec3 ditherApply(vec3 col, vec2 imgUv) {
 }
 `
 
-export const ditherUniforms = () => ({
+export const ditherUniforms = (): Uniforms => ({
   uDitherOn: { value: 0 },
   uDitherPass: { value: 1 },
   uDitherPattern: { value: 1 },
@@ -109,7 +110,7 @@ export const ditherUniforms = () => ({
   uDitherLight: { value: new THREE.Vector3(1, 1, 1) },
 })
 
-export function applyDither(u, p) {
+export function applyDither(u: Uniforms, p: Params) {
   u.uDitherOn.value = p.ditherOn ? 1 : 0
   u.uDitherPattern.value = PATTERNS.indexOf(p.ditherPattern)
   u.uDitherMode.value = MODES.indexOf(p.ditherMode)
@@ -121,7 +122,7 @@ export function applyDither(u, p) {
 }
 
 // Copia los uniforms de dithering de un material a otro (efecto → composición)
-export function copyDitherUniforms(from, to) {
+export function copyDitherUniforms(from: Uniforms, to: Uniforms) {
   for (const key of Object.keys(ditherUniforms())) {
     const v = from[key].value
     if (v?.isVector3) to[key].value.copy(v)

@@ -1,6 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type PointerEvent,
+} from 'react'
 import * as THREE from 'three'
 import { NODE_TYPES } from '@/lib/nodes'
 import { GraphEngine, wouldCycle } from '@/lib/nodes/engine'
@@ -16,6 +25,8 @@ import {
   HEADER_H,
 } from '@/lib/nodes/graph'
 import { exportPNG, exportMP4, canExportVideo, downloadBlob } from '@/lib/nodes/exporter'
+import type { Format } from '@/lib/formats'
+import type { Edge, Graph, GraphNode, ImageMap, InputTexture, OutputSettings, ParamValue, Point } from '@/lib/nodes/types'
 import NodeCard from './NodeCard'
 import OutputBody from './OutputBody'
 import Library from './Library'
@@ -31,50 +42,79 @@ const TOUR_KEY = 'croma-onboarding-v1'
 const MOBILE_QUERY = '(max-width: 760px)'
 const MOBILE_BAR = 84 // alto reservado para la barra de la biblioteca en móvil
 
-const isTyping = (el) =>
-  el && (el.isContentEditable || /^(TEXTAREA|SELECT)$/.test(el.tagName) ||
-    (el.tagName === 'INPUT' && !['range', 'color', 'button', 'checkbox'].includes(el.type)))
+interface View {
+  x: number
+  y: number
+  k: number
+}
+
+// Estado vigente que leen los callbacks estables (gestos, loop de dibujo, teclado)
+interface LiveState {
+  graph: Graph
+  view: View
+  focus: boolean
+  format: Format
+  duration: number
+  playing: boolean
+  selected: string | null
+  selectedEdge: string | null
+  libraryCollapsed: boolean
+  tourOpen: boolean
+  isMobile: boolean
+}
+
+// Gesto táctil o de puntero sobre el fondo: punteros activos → última posición
+interface Gesture {
+  pts: Map<number, Point>
+}
+
+const isTyping = (target: EventTarget | null) => {
+  const el = target as HTMLElement | null
+  return el && (el.isContentEditable || /^(TEXTAREA|SELECT)$/.test(el.tagName) ||
+    (el.tagName === 'INPUT' && !['range', 'color', 'button', 'checkbox'].includes((el as HTMLInputElement).type)))
+}
 
 // Curva de un cable entre dos puertos (tangentes horizontales)
-function wirePath(a, b) {
+function wirePath(a: Point, b: Point) {
   const dx = Math.max(50, Math.abs(b.x - a.x) * 0.5)
   return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x} ${b.y}`
 }
-function wireMid(a, b) {
+function wireMid(a: Point, b: Point): Point {
   const dx = Math.max(50, Math.abs(b.x - a.x) * 0.5)
   // Punto medio de la Bézier cúbica: (P0 + 3P1 + 3P2 + P3) / 8
   return { x: (a.x + 3 * (a.x + dx) + 3 * (b.x - dx) + b.x) / 8, y: (a.y + 3 * a.y + 3 * b.y + b.y) / 8 }
 }
 
 export default function Editor() {
-  const canvasRef = useRef(null)
-  const workspaceRef = useRef(null)
-  const glRef = useRef(null)
-  const imagesRef = useRef(new Map())
-  const resultsRef = useRef(new Map())
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const workspaceRef = useRef<HTMLDivElement>(null)
+  const glRef = useRef<{ renderer: THREE.WebGLRenderer; engine: GraphEngine } | null>(null)
+  const imagesRef = useRef<ImageMap>(new Map())
+  const resultsRef = useRef(new Map<string, InputTexture>())
   const dirtyRef = useRef(true)
   const rafRef = useRef(0)
   const timeRef = useRef(0)
-  const progressRef = useRef(null)
-  const timeLabelRef = useRef(null)
-  const focusRef = useRef(null)
+  const progressRef = useRef<HTMLInputElement>(null)
+  const timeLabelRef = useRef<HTMLSpanElement>(null)
+  const focusRef = useRef<HTMLDivElement>(null)
 
   const [graph, setGraph] = useState(initialGraph)
   const [loaded, setLoaded] = useState(false)
-  const [view, setView] = useState({ x: LIBRARY_SPACE + 60, y: 120, k: 0.9 })
-  const [selected, setSelected] = useState(null)
-  const [connecting, setConnecting] = useState(null) // { from, x, y } en coordenadas del lienzo
-  const [hoverEdge, setHoverEdge] = useState(null)
+  const [view, setView] = useState<View>({ x: LIBRARY_SPACE + 60, y: 120, k: 0.9 })
+  const [selected, setSelected] = useState<string | null>(null)
+  // Cable en curso: desde qué nodo y punta en coordenadas del lienzo
+  const [connecting, setConnecting] = useState<({ from: string } & Point) | null>(null)
+  const [hoverEdge, setHoverEdge] = useState<string | null>(null)
   // Cable seleccionado con toque/clic: su × queda visible (en móvil no hay hover)
-  const [selectedEdge, setSelectedEdge] = useState(null)
+  const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
   const [focus, setFocus] = useState(false)
   const [playing, setPlaying] = useState(false)
-  const [exportProgress, setExportProgress] = useState(null)
+  const [exportProgress, setExportProgress] = useState<number | null>(null)
   const [libraryCollapsed, setLibraryCollapsed] = useState(false)
-  const [imageNames, setImageNames] = useState({})
+  const [imageNames, setImageNames] = useState<Record<string, string>>({})
   const [tourOpen, setTourOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const gestureRef = useRef(null)
+  const gestureRef = useRef<Gesture | null>(null)
 
   // Móvil: la biblioteca es una hoja inferior, plegada al empezar
   useEffect(() => {
@@ -95,7 +135,7 @@ export default function Editor() {
   const outputNode = graph.nodes.find((n) => n.type === 'output')
 
   // Estado vigente para callbacks estables (gestos, loop de dibujo)
-  const live = useRef({})
+  const live = useRef<LiveState>(null!)
   live.current = { graph, view, focus, format, duration, playing, selected, selectedEdge, libraryCollapsed, tourOpen, isMobile }
 
   const loopT = () => (timeRef.current % live.current.duration) / live.current.duration
@@ -120,16 +160,16 @@ export default function Editor() {
     gl.engine.clear()
     const H = window.innerHeight
     const W = window.innerWidth
-    const blitEl = (el, id) => {
+    const blitEl = (el: Element, id: string | undefined) => {
       const r = el.getBoundingClientRect()
       if (r.width < 1 || r.right < 0 || r.left > W || r.bottom < 0 || r.top > H) return
-      gl.engine.blit(resultsRef.current.get(id) ?? null, { x: r.left, y: H - r.bottom, w: r.width, h: r.height })
+      gl.engine.blit((id && resultsRef.current.get(id)) || null, { x: r.left, y: H - r.bottom, w: r.width, h: r.height })
     }
     if (focus && focusRef.current) {
       const out = live.current.graph.nodes.find((n) => n.type === 'output')
       blitEl(focusRef.current, out?.id)
     } else {
-      document.querySelectorAll('[data-preview]').forEach((el) => blitEl(el, el.dataset.preview))
+      document.querySelectorAll<HTMLElement>('[data-preview]').forEach((el) => blitEl(el, el.dataset.preview))
     }
   }, [])
 
@@ -148,7 +188,7 @@ export default function Editor() {
 
   // Renderer WebGL a pantalla completa, detrás de las tarjetas
   useEffect(() => {
-    const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, alpha: true, antialias: false })
+    const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current!, alpha: true, antialias: false })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(window.innerWidth, window.innerHeight, false)
     glRef.current = { renderer, engine: new GraphEngine(renderer, imagesRef.current) }
@@ -162,7 +202,7 @@ export default function Editor() {
       window.removeEventListener('resize', onResize)
       cancelAnimationFrame(rafRef.current)
       rafRef.current = 0
-      glRef.current.engine.dispose()
+      glRef.current?.engine.dispose()
       renderer.dispose()
       glRef.current = null
     }
@@ -208,9 +248,9 @@ export default function Editor() {
 
   useEffect(() => {
     if (!playing) return
-    let raf
+    let raf = 0
     let last = performance.now()
-    const tick = (now) => {
+    const tick = (now: number) => {
       timeRef.current = (timeRef.current + (now - last) / 1000) % live.current.duration
       last = now
       dirtyRef.current = true
@@ -222,7 +262,7 @@ export default function Editor() {
     return () => cancelAnimationFrame(raf)
   }, [playing, draw, syncTimeline])
 
-  const scrub = (fraction) => {
+  const scrub = (fraction: number) => {
     timeRef.current = fraction * duration
     dirtyRef.current = true
     requestDraw()
@@ -231,28 +271,28 @@ export default function Editor() {
 
   // ------------------------------------------------------- edición del grafo
 
-  const updateNode = (id, patch) =>
+  const updateNode = (id: string, patch: Partial<GraphNode>) =>
     setGraph((g) => ({ ...g, nodes: g.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) }))
 
-  const setParam = (id, key, value) =>
+  const setParam = (id: string, key: string, value: ParamValue) =>
     setGraph((g) => ({
       ...g,
       nodes: g.nodes.map((n) => (n.id === id ? { ...n, params: { ...n.params, [key]: value } } : n)),
     }))
 
-  const setOutput = (patch) => setGraph((g) => ({ ...g, output: { ...g.output, ...patch } }))
+  const setOutput = (patch: Partial<OutputSettings>) => setGraph((g) => ({ ...g, output: { ...g.output, ...patch } }))
 
-  const connect = (from, to, port) =>
+  const connect = (from: string, to: string, port: string) =>
     setGraph((g) => {
       if (wouldCycle(g, from, to)) return g
       return { ...g, edges: [...g.edges.filter((e) => !(e.to === to && e.port === port)), { from, to, port }] }
     })
 
-  const removeEdge = (edge) =>
+  const removeEdge = (edge: Pick<Edge, 'to' | 'port'>) =>
     setGraph((g) => ({ ...g, edges: g.edges.filter((e) => !(e.to === edge.to && e.port === edge.port)) }))
 
   // Al borrar un nodo intermedio se reconecta lo que entraba con lo que salía
-  const deleteNode = (id) =>
+  const deleteNode = (id: string) =>
     setGraph((g) => {
       const node = g.nodes.find((n) => n.id === id)
       if (!node || node.type === 'output') return g
@@ -267,11 +307,12 @@ export default function Editor() {
     })
 
   // Añadir desde la biblioteca: en una posición concreta (arrastre) o insertado antes de la salida
-  const addNode = (type, at) => {
+  const addNode = (type: string, at?: Point) => {
     const def = NODE_TYPES[type]
     setGraph((g) => {
       if (at) return { ...g, nodes: [...g.nodes, createNode(type, at.x, at.y)] }
       const out = g.nodes.find((n) => n.type === 'output')
+      if (!out) return g
       const into = g.edges.find((e) => e.to === out.id && e.port === 'in')
       const prev = into && g.nodes.find((n) => n.id === into.from)
 
@@ -307,7 +348,7 @@ export default function Editor() {
     setTimeout(() => fitView(), 0)
   }
 
-  const loadImage = async (id, file) => {
+  const loadImage = async (id: string, file: File) => {
     const img = new Image()
     img.src = URL.createObjectURL(file)
     await img.decode()
@@ -323,7 +364,7 @@ export default function Editor() {
 
   // ------------------------------------------------------------ vista
 
-  const toGraph = (clientX, clientY) => {
+  const toGraph = (clientX: number, clientY: number): Point => {
     const { view } = live.current
     return { x: (clientX - view.x) / view.k, y: (clientY - view.y) / view.k }
   }
@@ -338,13 +379,13 @@ export default function Editor() {
     return { left, top: 30, w: window.innerWidth - left - 40, h: window.innerHeight - 60 }
   }
 
-  const fitBox = (x0, y0, x1, y1, maxK = 1) => {
+  const fitBox = (x0: number, y0: number, x1: number, y1: number, maxK = 1) => {
     const area = freeArea()
     const k = Math.min(maxK, Math.max(ZOOM_MIN, Math.min(area.w / (x1 - x0), area.h / (y1 - y0))))
     setView({ k, x: area.left + (area.w - (x1 - x0) * k) / 2 - x0 * k, y: area.top + (area.h - (y1 - y0) * k) / 2 - y0 * k })
   }
 
-  const nodeBox = (n, a) => ({
+  const nodeBox = (n: GraphNode, a: number) => ({
     x0: n.x,
     y0: n.y,
     x1: n.x + nodeWidth(n),
@@ -352,7 +393,7 @@ export default function Editor() {
   })
 
   // Doble toque / doble clic en la cabecera: acerca la vista a ese nodo
-  const zoomToNode = (id) => {
+  const zoomToNode = (id: string) => {
     const { graph, format } = live.current
     const n = graph.nodes.find((x) => x.id === id)
     if (!n) return
@@ -407,8 +448,8 @@ export default function Editor() {
 
   // Pan con arrastre del fondo, rueda para desplazar, Ctrl/⌘ + rueda (o pinza) para zoom
   useEffect(() => {
-    const el = workspaceRef.current
-    const onWheel = (e) => {
+    const el = workspaceRef.current!
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       if (e.ctrlKey || e.metaKey) {
         setView((v) => {
@@ -424,16 +465,20 @@ export default function Editor() {
   }, [])
 
   // Arrastre genérico con captura en window
-  const drag = (e, onMove, onUp) => {
+  const drag = (
+    e: PointerEvent,
+    onMove: (ev: globalThis.PointerEvent, dx: number, dy: number) => void,
+    onUp?: (ev: globalThis.PointerEvent) => void,
+  ) => {
     e.preventDefault()
     let lastX = e.clientX
     let lastY = e.clientY
-    const move = (ev) => {
+    const move = (ev: globalThis.PointerEvent) => {
       onMove(ev, ev.clientX - lastX, ev.clientY - lastY)
       lastX = ev.clientX
       lastY = ev.clientY
     }
-    const up = (ev) => {
+    const up = (ev: globalThis.PointerEvent) => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
       onUp?.(ev)
@@ -443,10 +488,10 @@ export default function Editor() {
   }
 
   const startGesture = () => {
-    const g = { pts: new Map() }
-    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
-    const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
-    const move = (ev) => {
+    const g: Gesture = { pts: new Map() }
+    const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
+    const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+    const move = (ev: globalThis.PointerEvent) => {
       const prev = g.pts.get(ev.pointerId)
       if (!prev) return
       const cur = { x: ev.clientX, y: ev.clientY }
@@ -469,10 +514,10 @@ export default function Editor() {
       g.pts.set(ev.pointerId, cur)
     }
     // Un segundo dedo cuenta aunque caiga sobre una tarjeta
-    const down = (ev) => {
+    const down = (ev: globalThis.PointerEvent) => {
       if (ev.pointerType === 'touch') g.pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
     }
-    const up = (ev) => {
+    const up = (ev: globalThis.PointerEvent) => {
       g.pts.delete(ev.pointerId)
       if (g.pts.size === 0) {
         window.removeEventListener('pointermove', move)
@@ -489,17 +534,17 @@ export default function Editor() {
     return g
   }
 
-  const onWorkspaceDown = (e) => {
-    if (e.target !== e.currentTarget && !e.target.dataset.backdrop) return
+  const onWorkspaceDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget && !(e.target as HTMLElement).dataset.backdrop) return
     e.preventDefault()
     setSelected(null)
     setSelectedEdge(null)
-    if (!gestureRef.current) gestureRef.current = startGesture()
+    gestureRef.current ??= startGesture()
     gestureRef.current.pts.set(e.pointerId, { x: e.clientX, y: e.clientY })
   }
 
-  const lastTapRef = useRef({ id: null, t: 0 })
-  const onHeaderDown = (e, id) => {
+  const lastTapRef = useRef<{ id: string | null; t: number }>({ id: null, t: 0 })
+  const onHeaderDown = (e: PointerEvent, id: string) => {
     if (e.button !== 0) return
     // Doble toque táctil (el dblclick no es fiable con touch-action: none). Se mide con la marca
     // de tiempo del evento —cuándo tocó el dedo— y no con la hora de proceso, que se retrasa
@@ -520,22 +565,23 @@ export default function Editor() {
     })
   }
 
-  const startConnect = (e, from) => {
+  const startConnect = (e: PointerEvent, from: string) => {
     const p = toGraph(e.clientX, e.clientY)
     setConnecting({ from, ...p })
     drag(
       e,
       (ev) => setConnecting((c) => c && { ...c, ...toGraph(ev.clientX, ev.clientY) }),
       (ev) => {
-        const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-port-in]')
-        if (target) connect(from, target.dataset.node, target.dataset.port)
+        const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>('[data-port-in]')
+        const { node, port } = target?.dataset ?? {}
+        if (node && port) connect(from, node, port)
         setConnecting(null)
       },
     )
   }
 
   // Arrastrar desde una entrada conectada la desengancha para llevar el cable a otro sitio
-  const onInDown = (e, id, port) => {
+  const onInDown = (e: PointerEvent, id: string, port: string) => {
     e.stopPropagation()
     const edge = live.current.graph.edges.find((x) => x.to === id && x.port === port)
     if (!edge) return
@@ -543,12 +589,12 @@ export default function Editor() {
     startConnect(e, edge.from)
   }
 
-  const onOutDown = (e, id) => {
+  const onOutDown = (e: PointerEvent, id: string) => {
     e.stopPropagation()
     startConnect(e, id)
   }
 
-  const onDrop = (e) => {
+  const onDrop = (e: DragEvent) => {
     const type = e.dataTransfer.getData('application/x-croma-node')
     if (!type) return
     e.preventDefault()
@@ -572,7 +618,7 @@ export default function Editor() {
       downloadBlob(blob, name)
     } catch (err) {
       console.error(err)
-      alert(`No se pudo exportar el video: ${err.message}`)
+      alert(`No se pudo exportar el video: ${err instanceof Error ? err.message : err}`)
     } finally {
       setExportProgress(null)
     }
@@ -581,7 +627,7 @@ export default function Editor() {
   // --------------------------------------------------------------- teclado
 
   useEffect(() => {
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target) || live.current.tourOpen) return
       const { selected, selectedEdge, focus } = live.current
       if (e.key === 'Escape') {
@@ -596,7 +642,7 @@ export default function Editor() {
         e.preventDefault()
         deleteNode(selected)
         setSelected(null)
-      } else if (e.key === ' ' && !/^(BUTTON|INPUT)$/.test(e.target.tagName)) {
+      } else if (e.key === ' ' && !/^(BUTTON|INPUT)$/.test((e.target as HTMLElement).tagName)) {
         e.preventDefault()
         setPlaying((v) => !v)
       } else if (e.key === 'f' || e.key === 'F') {
@@ -611,7 +657,7 @@ export default function Editor() {
   // --------------------------------------------------------------- render
 
   const byId = new Map(graph.nodes.map((n) => [n.id, n]))
-  const connectedInputs = (id) => new Set(graph.edges.filter((e) => e.to === id).map((e) => e.port))
+  const connectedInputs = (id: string) => new Set(graph.edges.filter((e) => e.to === id).map((e) => e.port))
 
   const outputBody = (
     <OutputBody
@@ -719,7 +765,7 @@ export default function Editor() {
                 aspect={aspect}
                 selected={selected === node.id}
                 connectedInputs={connectedInputs(node.id)}
-                connecting={Boolean(connecting) && connecting.from !== node.id}
+                connecting={connecting !== null && connecting.from !== node.id}
                 imageName={imageNames[node.id]}
                 onSelect={(id) => {
                   setSelected(id)
@@ -727,7 +773,7 @@ export default function Editor() {
                 }}
                 onHeaderDown={onHeaderDown}
                 onHeaderDoubleClick={zoomToNode}
-                onToggleBypass={(id) => updateNode(id, { bypass: !byId.get(id).bypass })}
+                onToggleBypass={(id) => updateNode(id, { bypass: !byId.get(id)?.bypass })}
                 onDelete={deleteNode}
                 onParam={setParam}
                 onOutDown={onOutDown}
@@ -770,7 +816,7 @@ export default function Editor() {
             </button>
           </div>
           <div className={s.focusStage}>
-            <div ref={focusRef} className={s.focusFrame} style={{ '--ar': aspect }} />
+            <div ref={focusRef} className={s.focusFrame} style={{ '--ar': aspect } as CSSProperties} />
           </div>
         </div>
       )}

@@ -1,18 +1,31 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import type { Format } from '@/lib/formats'
+import type { Control, Option, Params, ParamValue } from '@/lib/nodes/types'
 import ColorPicker from './ColorPicker'
 import s from './fields.module.css'
 
-function decimals(step) {
+function decimals(step: number) {
   const str = String(step)
   return str.includes('.') ? str.split('.')[1].length : 0
 }
 
 // Posición del centro del thumb para una fracción 0..1 del rango
-const thumbCenter = (f) => `(${f} * (100% - var(--tw)) + var(--tw) / 2)`
+const thumbCenter = (f: number) => `(${f} * (100% - var(--tw)) + var(--tw) / 2)`
 
-export function Slider({ label, value, min, max, step, unit = '', dimmed, onChange }) {
+interface SliderProps {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  unit?: string
+  dimmed?: boolean
+  onChange: (value: number) => void
+}
+
+export function Slider({ label, value, min, max, step, unit = '', dimmed, onChange }: SliderProps) {
   const pct = (value - min) / (max - min)
   // Rangos bipolares rellenan desde el cero
   const zero = min < 0 && max > 0 ? -min / (max - min) : 0
@@ -45,9 +58,16 @@ export function Slider({ label, value, min, max, step, unit = '', dimmed, onChan
   )
 }
 
-export function ColorField({ label, value, dimmed, onChange }) {
+interface ColorFieldProps {
+  label: string
+  value: string
+  dimmed?: boolean
+  onChange: (value: string) => void
+}
+
+export function ColorField({ label, value, dimmed, onChange }: ColorFieldProps) {
   const [open, setOpen] = useState(false)
-  const anchorRef = useRef(null)
+  const anchorRef = useRef<HTMLButtonElement>(null)
   return (
     <div className={`${s.row} ${dimmed ? s.dimmed : ''}`}>
       <span className={s.label}>{label}</span>
@@ -70,7 +90,7 @@ export function ColorField({ label, value, dimmed, onChange }) {
   )
 }
 
-export function ToggleField({ label, value, onChange }) {
+export function ToggleField({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   return (
     <label className={s.row}>
       <span className={s.label}>{label}</span>
@@ -88,7 +108,15 @@ export function ToggleField({ label, value, onChange }) {
   )
 }
 
-export function SelectField({ label, value, options, dimmed, onChange }) {
+interface SelectFieldProps {
+  label: string
+  value: string
+  options: readonly Option[]
+  dimmed?: boolean
+  onChange: (value: string) => void
+}
+
+export function SelectField({ label, value, options, dimmed, onChange }: SelectFieldProps) {
   return (
     <label className={`${s.row} ${dimmed ? s.dimmed : ''}`}>
       <span className={s.label}>{label}</span>
@@ -108,7 +136,7 @@ export function SelectField({ label, value, options, dimmed, onChange }) {
   )
 }
 
-export function FormatPicker({ formats, value, onChange }) {
+export function FormatPicker({ formats, value, onChange }: { formats: Format[]; value: string; onChange: (id: string) => void }) {
   return (
     <div className={s.formats} role="radiogroup" aria-label="Formato">
       {formats.map((f) => {
@@ -146,10 +174,16 @@ export function FormatPicker({ formats, value, onChange }) {
 
 // Renderiza los controles de un grupo. Un control se atenúa si depende de un interruptor apagado
 // (dependsOn) o si solo aplica a otro valor de un selector (activeWhen: [clave, valor]).
-export function ParamControls({ controls, params, onChange }) {
+interface ParamControlsProps {
+  controls: Control[]
+  params: Params
+  onChange: (key: string, value: ParamValue) => void
+}
+
+export function ParamControls({ controls, params, onChange }: ParamControlsProps) {
   return controls.map((c) => {
     if (c.hidden) return null
-    const set = (v) => onChange(c.key, v)
+    const set = (v: ParamValue) => onChange(c.key, v)
     const off =
       (c.dependsOn ? !params[c.dependsOn] : false) || (c.activeWhen ? params[c.activeWhen[0]] !== c.activeWhen[1] : false)
     switch (c.type) {

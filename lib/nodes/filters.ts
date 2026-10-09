@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { HEADER, blendControls, blendIndex, TAU } from './common'
 import { ditherGroup, ditherGLSL, ditherUniforms, applyDither } from './ditherLayer'
+import type { NodeDef } from './types'
 
 // ---------------------------------------------------------------------------
 // Dithering
@@ -10,7 +11,7 @@ const ditherControls = ditherGroup()
   .controls.filter((c) => c.key !== 'ditherOn')
   .map(({ dependsOn, ...c }) => c)
 
-export const dither = {
+export const dither: NodeDef = {
   type: 'dither',
   title: 'Dithering',
   category: 'filter',
@@ -37,7 +38,7 @@ void main() {
 
 const BLUR_TAPS = 24
 
-export const blur = {
+export const blur: NodeDef = {
   type: 'blur',
   title: 'Desenfoque',
   category: 'filter',
@@ -100,7 +101,7 @@ void main() {
 // Grano y viñeta (con aberración de lente)
 // ---------------------------------------------------------------------------
 
-export const grain = {
+export const grain: NodeDef = {
   type: 'grain',
   title: 'Grano y viñeta',
   category: 'filter',
@@ -175,7 +176,7 @@ void main() {
 
 const MOTIONS = ['drift', 'zoom', 'rotate', 'wave']
 
-export const motion = {
+export const motion: NodeDef = {
   type: 'motion',
   title: 'Animación',
   category: 'motion',
@@ -250,7 +251,7 @@ void main() {
 // Mezcla: combina dos ramas con un modo de fusión
 // ---------------------------------------------------------------------------
 
-export const mix = {
+export const mix: NodeDef = {
   type: 'mix',
   title: 'Mezcla',
   category: 'combine',
@@ -278,7 +279,7 @@ void main() {
 // Salida: no tiene shader; muestra su entrada y guarda formato, duración y fps
 // ---------------------------------------------------------------------------
 
-export const output = {
+export const output: NodeDef = {
   type: 'output',
   title: 'Output',
   category: 'output',

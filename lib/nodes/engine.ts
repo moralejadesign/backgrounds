@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { NODE_TYPES } from './index'
 import { vertexShader, commonUniforms } from './common'
+import type { Entry, Graph, GraphNode, ImageMap, InputTexture, NodeDef } from './types'
 
 // Motor del grafo: renderiza cada nodo a su propia textura en orden de dependencias.
 // Lo usan el editor (a resolución de trabajo, con previews en pantalla) y el export
@@ -16,7 +17,7 @@ void main() {
 }
 `
 
-const RT_OPTIONS = {
+const RT_OPTIONS: THREE.RenderTargetOptions = {
   type: THREE.HalfFloatType, // precisión extra: sin bandas en degradados ni al encadenar efectos
   minFilter: THREE.LinearFilter,
   magFilter: THREE.LinearFilter,
@@ -25,12 +26,12 @@ const RT_OPTIONS = {
 
 // Orden topológico de todo el grafo (también los nodos que no llegan a la salida,
 // para que sus previews se vean). Las aristas que formarían ciclos se ignoran.
-export function topoOrder(graph) {
-  const deps = new Map(graph.nodes.map((n) => [n.id, []]))
-  for (const e of graph.edges) if (deps.has(e.to) && deps.has(e.from)) deps.get(e.to).push(e.from)
-  const order = []
-  const state = new Map()
-  const visit = (id) => {
+export function topoOrder(graph: Graph) {
+  const deps = new Map<string, string[]>(graph.nodes.map((n) => [n.id, []]))
+  for (const e of graph.edges) if (deps.has(e.to) && deps.has(e.from)) deps.get(e.to)!.push(e.from)
+  const order: string[] = []
+  const state = new Map<string, number>()
+  const visit = (id: string) => {
     if (state.get(id) === 2) return
     if (state.get(id) === 1) return // ciclo
     state.set(id, 1)
@@ -43,12 +44,12 @@ export function topoOrder(graph) {
 }
 
 // ¿Conectar from → to crearía un ciclo? (sí, si to ya llega a from)
-export function wouldCycle(graph, from, to) {
+export function wouldCycle(graph: Graph, from: string, to: string) {
   if (from === to) return true
   const stack = [to]
-  const seen = new Set()
+  const seen = new Set<string>()
   while (stack.length) {
-    const id = stack.pop()
+    const id = stack.pop()!
     if (id === from) return true
     if (seen.has(id)) continue
     seen.add(id)
@@ -58,7 +59,15 @@ export function wouldCycle(graph, from, to) {
 }
 
 export class GraphEngine {
-  constructor(renderer, images = new Map()) {
+  renderer: THREE.WebGLRenderer
+  images: ImageMap
+  entries: Map<string, Entry>
+  mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.Material>
+  scene: THREE.Scene
+  camera: THREE.Camera
+  blitMat: THREE.ShaderMaterial
+
+  constructor(renderer: THREE.WebGLRenderer, images: ImageMap = new Map()) {
     this.renderer = renderer
     this.images = images // nodeId → THREE.Texture (nodos Imagen)
     this.entries = new Map() // nodeId → { type, material, rt, tmp }
@@ -73,7 +82,7 @@ export class GraphEngine {
     })
   }
 
-  entryFor(node, def, width, height) {
+  entryFor(node: GraphNode, def: NodeDef, width: number, height: number): Entry {
     let entry = this.entries.get(node.id)
     if (!entry || entry.type !== node.type) {
       if (entry) this.disposeEntry(entry)
@@ -82,7 +91,7 @@ export class GraphEngine {
         material: new THREE.ShaderMaterial({
           vertexShader,
           fragmentShader: def.fragment,
-          uniforms: { ...commonUniforms(), ...def.uniforms() },
+          uniforms: { ...commonUniforms(), ...def.uniforms?.() },
         }),
         rt: new THREE.WebGLRenderTarget(width, height, RT_OPTIONS),
         tmp: null,
@@ -93,13 +102,13 @@ export class GraphEngine {
     return entry
   }
 
-  tempTarget(entry, width, height) {
+  tempTarget(entry: Entry, width: number, height: number) {
     if (!entry.tmp) entry.tmp = new THREE.WebGLRenderTarget(width, height, RT_OPTIONS)
     if (entry.tmp.width !== width || entry.tmp.height !== height) entry.tmp.setSize(width, height)
     return entry.tmp
   }
 
-  pass(material, target) {
+  pass(material: THREE.Material, target: THREE.WebGLRenderTarget | null) {
     this.mesh.material = material
     this.renderer.setRenderTarget(target)
     this.renderer.render(this.scene, this.camera)
@@ -112,16 +121,19 @@ export class GraphEngine {
    * @param t     instante del loop (0..1)
    * @returns Map nodeId → textura de salida del nodo (la salida devuelve su entrada)
    */
-  evaluate(graph, { width, height, res, t }) {
-    const results = new Map()
+  evaluate(
+    graph: Graph,
+    { width, height, res, t }: { width: number; height: number; res: { w: number; h: number }; t: number },
+  ) {
+    const results = new Map<string, InputTexture>()
     const incoming = new Map(graph.edges.map((e) => [`${e.to}:${e.port}`, e.from]))
     const byId = new Map(graph.nodes.map((n) => [n.id, n]))
 
     for (const id of topoOrder(graph)) {
       const node = byId.get(id)
-      const def = NODE_TYPES[node.type]
-      if (!def) continue
-      const inputs = def.inputs.map((port) => {
+      const def = node && NODE_TYPES[node.type]
+      if (!node || !def) continue
+      const inputs = def.inputs.map((port): InputTexture => {
         const from = incoming.get(`${id}:${port}`)
         return from ? results.get(from) ?? null : null
       })
@@ -143,7 +155,7 @@ export class GraphEngine {
       u.uHasInput.value = inputs[0] ? 1 : 0
       u.uInputB.value = inputs[1] ?? null
       u.uHasInputB.value = inputs[1] ? 1 : 0
-      def.apply(u, p, { t, engine: this, nodeId: id })
+      def.apply?.(u, p, { t, engine: this, nodeId: id })
 
       if (def.render) def.render(this, entry, inputs, p)
       else this.pass(entry.material, entry.rt)
@@ -169,7 +181,7 @@ export class GraphEngine {
 
   // Dibuja una textura en un rectángulo del lienzo (px CSS, origen abajo a la izquierda;
   // three aplica el pixel ratio en setViewport/setScissor)
-  blit(texture, { x, y, w, h }) {
+  blit(texture: InputTexture, { x, y, w, h }: { x: number; y: number; w: number; h: number }) {
     const r = this.renderer
     r.setRenderTarget(null)
     r.setViewport(x, y, w, h)
@@ -182,7 +194,7 @@ export class GraphEngine {
     r.setScissorTest(false)
   }
 
-  disposeEntry(entry) {
+  disposeEntry(entry: Entry) {
     entry.material.dispose()
     entry.rt.dispose()
     entry.tmp?.dispose()

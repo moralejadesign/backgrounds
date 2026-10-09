@@ -12,8 +12,9 @@ import {
   TAU,
 } from './common'
 import { glassGroup, glassGLSL, glassUniforms, applyGlass } from './glassLayer'
+import type { NodeDef, Option } from './types'
 
-const MODE_OPTIONS = [
+const MODE_OPTIONS: Option[] = [
   ['material', 'Usar imagen'],
   ['overlay', 'Encima'],
 ]
@@ -42,7 +43,7 @@ const glassControls = glassGroup({
   .controls.filter((c) => c.key !== 'glassOn')
   .map(({ dependsOn, ...c }) => c)
 
-export const glass = {
+export const glass: NodeDef = {
   type: 'glass',
   title: 'Glass',
   category: 'effect',
@@ -99,7 +100,7 @@ void main() {
 
 const RIBBON_COLORS = 5
 
-export const ribbon = {
+export const ribbon: NodeDef = {
   type: 'ribbon',
   title: 'Chrome ribbon',
   category: 'effect',
@@ -312,7 +313,7 @@ void main() {
 
 const DOF_SAMPLES = 16
 
-export const holo = {
+export const holo: NodeDef = {
   type: 'holo',
   title: 'Chroma holographic',
   category: 'effect',
