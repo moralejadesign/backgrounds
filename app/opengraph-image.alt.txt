@@ -1,0 +1,1 @@
+COOOOL BACKGROUNDS MAKER: make custom shader backgrounds. A Dithering node card with a magenta and cyan dithered preview.
